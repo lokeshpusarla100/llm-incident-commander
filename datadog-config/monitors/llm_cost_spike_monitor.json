@@ -1,0 +1,37 @@
+{
+    "id": "llm-cost-spike-monitor",
+    "name": "[LLM Economics] Cost spike detected - immediate action required",
+    "type": "metric alert",
+    "query": "avg(last_5m):avg:llm.cost.usd_per_request{service:llm-incident-commander} > avg(last_1h):avg:llm.cost.usd_per_request{service:llm-incident-commander} * 1.5 && avg(last_5m):avg:llm.cost.usd_per_request{service:llm-incident-commander} > 0.0001",
+    "message": "## 🚨 LLM COST SPIKE DETECTED\n\n**Alert Trigger:**\nCost per request >50% above 1h baseline AND >$0.0001/request\n\n**Current Metrics:**\n- Cost per request: ${{avg(last_5m):avg:llm.cost.usd_per_request}}\n- 1h baseline: ${{avg(last_1h):avg:llm.cost.usd_per_request}}\n- Increase: {{(value/baseline - 1)*100}}%\n\n**Root Cause Analysis:**\nInput tokens: {{avg(last_5m):avg:llm.tokens.input}}\nOutput tokens: {{avg(last_5m):avg:llm.tokens.output}}\nModel: {{model}}\n\n**Action Required:**\n1. Review token metrics - identify which spiked (input or output)\n2. If input: Check Vector Search context retrieval\n3. If output: Check system prompt for verbose behavior\n4. [Dashboard](https://app.datadoghq.com/dashboard/llm-operational-dashboard)\n\n@on-call-ai-infrastructure",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:high",
+        "category:economics",
+        "automation:incident"
+    ],
+    "options": {
+        "thresholds": {
+            "critical": 1.5,
+            "warning": 1.25
+        },
+        "evaluation_delay": 60,
+        "include_tags": true
+    },
+    "notify_by": [
+        "incident"
+    ],
+    "incident": {
+        "severity": "SEV-2",
+        "fields": {
+            "cost_per_request_current": "{{avg(last_5m):avg:llm.cost.usd_per_request}}",
+            "cost_per_request_baseline": "{{avg(last_1h):avg:llm.cost.usd_per_request}}",
+            "increase_percent": "{{(value/baseline - 1)*100}}",
+            "input_tokens_avg": "{{avg(last_5m):avg:llm.tokens.input}}",
+            "output_tokens_avg": "{{avg(last_5m):avg:llm.tokens.output}}",
+            "model": "{{model}}",
+            "monitor_name": "llm_cost_spike_monitor"
+        }
+    },
+    "priority": 2
+}

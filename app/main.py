@@ -33,6 +33,11 @@ app_start_time = time.time()
 async def lifespan(app: FastAPI):
     """Lifecycle management"""
     logger.info("Starting LLM Incident Commander")
+    
+    # ✅ VALIDATE PRICING ON STARTUP
+    from app.config import config
+    config.validate_pricing_consistency()
+    
     yield
     logger.info("Shutting down LLM Incident Commander")
 

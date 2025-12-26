@@ -58,7 +58,6 @@ async def run_judge_evaluation_two_stage(
             question=question[:500]
         )
         
-        input_tokens = config.estimate_tokens(prompt)
         
         # Use async with run_in_executor for blocking call
         loop = asyncio.get_event_loop()
@@ -73,6 +72,15 @@ async def run_judge_evaluation_two_stage(
                 }
             )
         )
+        
+        # ✅ REAL TOKEN ACCOUNTING FOR JUDGE
+        if not hasattr(judge_response, 'usage_metadata') or not judge_response.usage_metadata:
+             logger.error("Judge API response missing usage_metadata", extra={"request_id": request_id})
+             statsd.increment("llm.judge.tokens.metadata.missing")
+             return None
+             
+        input_tokens = judge_response.usage_metadata.prompt_token_count
+        output_tokens = judge_response.usage_metadata.candidates_token_count
         
         # Parse JSON response
         try:
@@ -97,7 +105,6 @@ async def run_judge_evaluation_two_stage(
         reasoning = eval_data.get("reasoning", "")
         
         # Calculate cost
-        output_tokens = config.estimate_tokens(judge_response.text)
         total_tokens = input_tokens + output_tokens
         judge_cost = config.calculate_cost(input_tokens, output_tokens)
         

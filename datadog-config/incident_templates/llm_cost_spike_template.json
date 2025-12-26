@@ -1,0 +1,34 @@
+{
+    "id": "llm_cost_spike_template",
+    "type": "incident_template",
+    "name": "LLM Cost Spike Incident",
+    "description": "Auto-created incident for cost spike detection",
+    "severity": "SEV-2",
+    "status": "open",
+    "notification_handles": [
+        "@on-call-ai-infrastructure",
+        "@cost-optimization-team"
+    ],
+    "fields": {
+        "cost_per_request_current": {
+            "type": "string",
+            "required": true,
+            "description": "Current cost per request in USD"
+        },
+        "cost_per_request_baseline": {
+            "type": "string",
+            "required": true,
+            "description": "Baseline cost per request"
+        },
+        "model": {
+            "type": "string",
+            "required": true,
+            "description": "Gemini model name"
+        }
+    },
+    "links": {
+        "dashboard": "https://app.datadoghq.com/dashboard/llm-operational-dashboard",
+        "runbook": "https://github.com/YOUR_ORG/llm-incident-commander/blob/main/RUNBOOKS.md#cost-spike",
+        "monitor": "llm-cost-spike-monitor"
+    }
+}

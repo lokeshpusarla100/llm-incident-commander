@@ -1,0 +1,123 @@
+{
+    "title": "🚨 LLM Incident Commander - OPERATIONAL STATUS",
+    "description": "Real-time decision dashboard: Is it safe to run?",
+    "layout_type": "ordered",
+    "widgets": [
+        {
+            "id": "status-summary",
+            "definition": {
+                "title": "🚦 LLM SAFE TO RUN? (Decision Widget)",
+                "type": "check_status",
+                "query": "service:llm-incident-commander",
+                "color": "green",
+                "summary": {
+                    "show": true,
+                    "type": "auto"
+                }
+            }
+        },
+        {
+            "id": "cost-burn-rate",
+            "definition": {
+                "title": "💰 Cost Burn Rate",
+                "type": "timeseries",
+                "requests": [
+                    {
+                        "q": "sum:llm.cost.usd{service:llm-incident-commander}.as_rate()",
+                        "display_type": "line",
+                        "style": {
+                            "palette": "cool",
+                            "line_type": "solid",
+                            "line_width": "normal"
+                        }
+                    }
+                ],
+                "yaxis": {
+                    "min": 0,
+                    "label": "USD/sec"
+                },
+                "markers": [
+                    {
+                        "value": "0.01",
+                        "label": "Alert threshold ($0.01/min)",
+                        "type": "error dashed"
+                    }
+                ]
+            }
+        },
+        {
+            "id": "token-throughput",
+            "definition": {
+                "title": "📊 Token Throughput",
+                "type": "timeseries",
+                "requests": [
+                    {
+                        "q": "sum:llm.tokens.input{service:llm-incident-commander}.as_count()",
+                        "display_type": "bars",
+                        "style": {
+                            "palette": "warm",
+                            "line_type": "solid",
+                            "line_width": "normal"
+                        },
+                        "metadata": {
+                            "alias_name": "Input Tokens"
+                        }
+                    },
+                    {
+                        "q": "sum:llm.tokens.output{service:llm-incident-commander}.as_count()",
+                        "display_type": "bars",
+                        "style": {
+                            "palette": "cool",
+                            "line_type": "solid",
+                            "line_width": "normal"
+                        },
+                        "metadata": {
+                            "alias_name": "Output Tokens"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": "active-incidents",
+            "definition": {
+                "title": "🚨 ACTIVE INCIDENTS",
+                "type": "manage_status",
+                "query": "service:llm-incident-commander status:alert",
+                "sort": "status,asc",
+                "display_format": "countsAndList",
+                "hide_zero_counts": true
+            }
+        },
+        {
+            "id": "llm-unsafe-indicator",
+            "definition": {
+                "title": "🚫 LLM UNSAFE INDICATOR",
+                "type": "query_value",
+                "requests": [
+                    {
+                        "q": "avg(last_5m):avg:llm.hallucination.score{service:llm-incident-commander}",
+                        "aggregator": "avg",
+                        "conditional_formats": [
+                            {
+                                "comparator": "<",
+                                "value": 0.3,
+                                "palette": "green",
+                                "custom_bg_color": "#d4f2d4",
+                                "custom_fg_color": "#1a531b"
+                            },
+                            {
+                                "comparator": ">",
+                                "value": 0.7,
+                                "palette": "red",
+                                "custom_bg_color": "#f2d4d4",
+                                "custom_fg_color": "#531b1b"
+                            }
+                        ]
+                    }
+                ],
+                "autoscale": true
+            }
+        }
+    ]
+}

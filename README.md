@@ -111,7 +111,7 @@ This aligns with Datadog's LLM Observability product vision ([blog post](https:/
 **Legacy Metric:** We kept the original `llm.hallucination.score` (keyword-based) for comparison purposes.
 
 ### 2. **Cost Tracking** 💰
-Per-request cost estimation based on token usage and Gemini pricing.
+Per-request actual cost calculation based on official Gemini pricing.
 
 ### 3. **Context-Rich Incidents** 📝
 Auto-created incidents include APM traces, error logs, and runbooks.
@@ -304,9 +304,7 @@ llm-incident-commander/
 │
 ├── requirements.txt
 ├── LICENSE                  # MIT License
-└── README.md               # This file
-
-> **Note**: Screenshots focus on Datadog dashboards, traces, monitors, and incidents rather than application UI.
+├── README.md               # This file
 ```
 
 ---
@@ -323,14 +321,15 @@ Our observability strategy focuses on metrics that matter for LLM applications:
 - percentiles (p50, p95, p99) for latency distribution
 
 #### **Cost & Usage Metrics**
-- `llm.tokens.input` - Input token count (estimated)
-- `llm.tokens.output` - Output token count (estimated)
+- `llm.tokens.input` - Input token count (authoritative)
+- `llm.tokens.output` - Output token count (authoritative)
 - `llm.tokens.total` - Total tokens per request
-- `llm.cost.usd` - Estimated cost based on Gemini pricing
+- `llm.cost.usd` - Actual cost based on Gemini pricing
 
 #### **Quality Metrics**
 - `llm.hallucination.score` - Custom metric (0.0-1.0) detecting uncertainty
 - `llm.hallucination.high_score` - Counter for responses exceeding threshold
+- `llm.judge.hallucination_score` - Semantic score from Judge LLM
 
 #### **Error Metrics**
 - `llm.errors.total{error_type}` - Errors by type (quota, timeout, api_error)

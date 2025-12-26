@@ -106,7 +106,9 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
             span.set_tag("experiment.variant", variant)
             span.set_tag("rag.context_length", len(context))
             
-            input_tokens = config.estimate_tokens(req.question)
+            span.set_tag("rag.context_length", len(context))
+            
+            # input_tokens determined after response
             
             try:
                 generation_config = {
@@ -117,7 +119,12 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
                 response = await model.generate_content_async(req.question, generation_config=generation_config)
                 answer = response.text
                 
-                # ✅ GET REAL TOKENS FROM API RESPONSE
+                # ✅ STRICT TOKEN ACCOUNTING (FAIL CLOSED)
+                if not response.usage_metadata:
+                    logger.critical("Gemini API response missing usage_metadata", extra={"request_id": request_id})
+                    statsd.increment("llm.tokens.metadata.missing", tags=["severity:critical"])
+                    raise HTTPException(status_code=500, detail={"error": "token_metadata_unavailable", "message": "LLM telemetry integrity compromised"})
+
                 input_tokens = response.usage_metadata.prompt_token_count
                 output_tokens = response.usage_metadata.candidates_token_count
                 

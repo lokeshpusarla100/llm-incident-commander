@@ -1,0 +1,30 @@
+{
+    "id": "llm_hallucination_template",
+    "type": "incident_template",
+    "name": "LLM Hallucination Detected",
+    "description": "High hallucination score from judge evaluation",
+    "severity": "SEV-3",
+    "status": "open",
+    "fields": {
+        "hallucination_score": {
+            "type": "number",
+            "required": true,
+            "description": "Hallucination score 0.0-1.0"
+        },
+        "hallucination_type": {
+            "type": "enum",
+            "enum": [
+                "contradiction",
+                "unsupported",
+                "mixed"
+            ],
+            "required": true,
+            "description": "Type of hallucination detected"
+        },
+        "grounding_coverage": {
+            "type": "number",
+            "required": true,
+            "description": "Percentage of claims grounded in context"
+        }
+    }
+}

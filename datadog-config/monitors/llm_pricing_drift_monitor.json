@@ -1,0 +1,17 @@
+{
+    "id": "llm-pricing-drift-monitor",
+    "name": "[LLM Economics] Pricing map may have drifted from official rates",
+    "type": "log alert",
+    "query": "service:llm-incident-commander AND (\"Pricing map has been modified\" OR \"pricing.drift_detected\")",
+    "message": "## ⚠️ PRICING DRIFT ALERT\n\n**Alert Trigger:**\nPricing map validation detected divergence from official rates\n\n**Action Required:**\n1. Check Google Cloud official pricing: https://cloud.google.com/vertex-ai/pricing\n2. Compare with GEMINI_PRICING_MAP in app/config.py\n3. If rates changed: Update pricing map and increment verified_date\n\n@cost-management-team @compliance",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:medium",
+        "category:economics",
+        "automation:case"
+    ],
+    "notify_by": [
+        "log"
+    ],
+    "priority": 3
+}

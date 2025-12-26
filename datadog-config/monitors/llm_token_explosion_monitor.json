@@ -1,0 +1,27 @@
+{
+    "id": "llm-token-explosion-monitor",
+    "name": "[LLM Infrastructure] Token explosion - check Vector Search",
+    "type": "metric alert",
+    "query": "avg(last_5m):avg:llm.tokens.total{service:llm-incident-commander} > avg(last_24h):avg:llm.tokens.total{service:llm-incident-commander} * 2.0",
+    "message": "## 🔴 LLM TOKEN EXPLOSION ALERT\n\n**Critical:** Tokens per request 2x higher than 24h baseline\n\n**Metrics:**\n- Current avg: {{avg(last_5m):avg:llm.tokens.total}} tokens/request\n- 24h baseline: {{avg(last_24h):avg:llm.tokens.total}} tokens/request\n- Increase: +100%\n\n**Breakdown:**\n- Input: {{avg(last_5m):avg:llm.tokens.input}} (prompt + context)\n- Output: {{avg(last_5m):avg:llm.tokens.output}} (response)\n\n**Breaking Change Check:**\nDid someone change the Vector Search 'k' parameter?\n\n**Immediate Action:**\nReduce Vector Search k from {{k}} to {{k-1}}\n\n@infrastructure-team",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:high",
+        "category:infrastructure",
+        "automation:incident"
+    ],
+    "notify_by": [
+        "incident"
+    ],
+    "incident": {
+        "severity": "SEV-2",
+        "fields": {
+            "alert_type": "token_explosion",
+            "current_avg_tokens": "{{avg(last_5m):avg:llm.tokens.total}}",
+            "baseline_24h_tokens": "{{avg(last_24h):avg:llm.tokens.total}}",
+            "input_tokens": "{{avg(last_5m):avg:llm.tokens.input}}",
+            "output_tokens": "{{avg(last_5m):avg:llm.tokens.output}}"
+        }
+    },
+    "priority": 2
+}
