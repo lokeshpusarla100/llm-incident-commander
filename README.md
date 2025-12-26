@@ -130,7 +130,7 @@ pip install -r requirements.txt
 gcloud auth application-default login
 
 # Set project ID
-export GCP_PROJECT_ID="forms-e5771"  # Or your project ID
+export GCP_PROJECT_ID="project_id"
 ```
 
 ### 3. Configure Datadog
