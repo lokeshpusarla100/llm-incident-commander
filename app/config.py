@@ -8,7 +8,6 @@ class Config:
     """Application configuration"""
     
     # Google Cloud / Vertex AI
-    # Google Cloud / Vertex AI
     GCP_PROJECT_ID: str = os.getenv("GCP_PROJECT_ID")
     if not GCP_PROJECT_ID:
         # Fail fast if project ID is missing (Security Best Practice)
