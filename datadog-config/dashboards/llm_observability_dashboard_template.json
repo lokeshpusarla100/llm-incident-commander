@@ -209,6 +209,111 @@
                     "env:production"
                 ]
             }
+        },
+        {
+            "id": 14,
+            "definition": {
+                "title": "🚦 LLM Health Status",
+                "type": "query_value",
+                "requests": [
+                    {
+                        "q": "(sum:llm.requests.total{service:llm-incident-commander,status:success}.as_count() / sum:llm.requests.total{service:llm-incident-commander}.as_count()) * 100",
+                        "aggregator": "avg",
+                        "conditional_formats": [
+                            {
+                                "comparator": ">=",
+                                "value": 99,
+                                "palette": "white_on_green"
+                            },
+                            {
+                                "comparator": ">=",
+                                "value": 95,
+                                "palette": "white_on_yellow"
+                            },
+                            {
+                                "comparator": "<",
+                                "value": 95,
+                                "palette": "white_on_red"
+                            }
+                        ]
+                    }
+                ],
+                "precision": 1,
+                "text_align": "center",
+                "custom_unit": "%",
+                "title_size": "16",
+                "title_align": "center"
+            }
+        },
+        {
+            "id": 15,
+            "definition": {
+                "title": "💵 Cost Per Request (Avg)",
+                "type": "query_value",
+                "requests": [
+                    {
+                        "q": "avg:llm.cost.usd{service:llm-incident-commander}",
+                        "aggregator": "avg",
+                        "conditional_formats": [
+                            {
+                                "comparator": "<=",
+                                "value": 0.001,
+                                "palette": "white_on_green"
+                            },
+                            {
+                                "comparator": "<=",
+                                "value": 0.005,
+                                "palette": "white_on_yellow"
+                            },
+                            {
+                                "comparator": ">",
+                                "value": 0.005,
+                                "palette": "white_on_red"
+                            }
+                        ]
+                    }
+                ],
+                "precision": 6,
+                "custom_unit": "$"
+            }
+        },
+        {
+            "id": 16,
+            "definition": {
+                "title": "📈 Token Efficiency (Output/Input)",
+                "type": "timeseries",
+                "requests": [
+                    {
+                        "q": "avg:llm.token_efficiency{service:llm-incident-commander}",
+                        "display_type": "line",
+                        "style": {
+                            "palette": "green"
+                        }
+                    }
+                ],
+                "markers": [
+                    {
+                        "value": "y = 1",
+                        "display_type": "info dashed",
+                        "label": "Balanced I/O"
+                    }
+                ]
+            }
+        },
+        {
+            "id": 17,
+            "definition": {
+                "title": "🔔 Monitor Status Overview",
+                "type": "manage_status",
+                "display_format": "countsAndList",
+                "color_preference": "text",
+                "hide_zero_counts": false,
+                "query": "service:llm-incident-commander",
+                "sort": "status,asc",
+                "count": 10,
+                "start": 0,
+                "summary_type": "monitors"
+            }
         }
     ],
     "template_variables": [

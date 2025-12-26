@@ -1,0 +1,106 @@
+{
+    "_note": "Datadog Incident Management configuration for LLM Incident Commander",
+    "incident_settings": {
+        "service": "llm-incident-commander",
+        "auto_resolve": false,
+        "default_severity": "SEV-3"
+    },
+    "severity_mapping": {
+        "SEV-1": {
+            "name": "Critical",
+            "description": "Complete service outage or quota exhaustion",
+            "monitors": [
+                "quota_exhaustion_monitor"
+            ],
+            "response_time_minutes": 5,
+            "notification_channels": [
+                "pagerduty",
+                "slack-critical"
+            ]
+        },
+        "SEV-2": {
+            "name": "High",
+            "description": "Elevated error rate or cost spike affecting multiple users",
+            "monitors": [
+                "error_rate_monitor",
+                "cost_spike_monitor"
+            ],
+            "response_time_minutes": 15,
+            "notification_channels": [
+                "slack-llm-alerts"
+            ]
+        },
+        "SEV-3": {
+            "name": "Medium",
+            "description": "Performance degradation or prompt explosion",
+            "monitors": [
+                "high_latency_monitor",
+                "prompt_explosion_monitor"
+            ],
+            "response_time_minutes": 60,
+            "notification_channels": [
+                "slack-llm-alerts"
+            ]
+        },
+        "SEV-4": {
+            "name": "Low",
+            "description": "Quality issues requiring review",
+            "monitors": [
+                "hallucination_score_monitor"
+            ],
+            "response_time_minutes": 240,
+            "notification_channels": [
+                "email"
+            ]
+        }
+    },
+    "incident_types": {
+        "llm_outage": {
+            "title_template": "[LLM OUTAGE] {{monitor_name}}",
+            "description": "LLM service is unavailable or quota exhausted",
+            "required_fields": [
+                "trace_id",
+                "error_message",
+                "affected_endpoints"
+            ],
+            "runbook_url": "https://docs.internal/runbooks/llm-outage"
+        },
+        "llm_degradation": {
+            "title_template": "[LLM DEGRADED] {{monitor_name}}",
+            "description": "LLM service is experiencing degraded performance",
+            "required_fields": [
+                "latency_p95",
+                "affected_percentage"
+            ],
+            "runbook_url": "https://docs.internal/runbooks/llm-performance"
+        },
+        "llm_cost": {
+            "title_template": "[LLM COST] {{monitor_name}}",
+            "description": "LLM costs have spiked unexpectedly",
+            "required_fields": [
+                "cost_per_request",
+                "baseline_cost",
+                "impact_estimate"
+            ],
+            "runbook_url": "https://docs.internal/runbooks/llm-cost-control"
+        }
+    },
+    "auto_create_from_monitors": {
+        "enabled": true,
+        "monitors": [
+            "high_latency_monitor",
+            "error_rate_monitor",
+            "quota_exhaustion_monitor",
+            "cost_spike_monitor"
+        ],
+        "exclude_monitors": [
+            "hallucination_score_monitor"
+        ]
+    },
+    "notification_handles": {
+        "pagerduty": "@pagerduty-llm-oncall",
+        "slack-critical": "@slack-llm-critical",
+        "slack-llm-alerts": "@slack-llm-alerts",
+        "email": "@team-llm@company.com"
+    }
+}

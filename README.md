@@ -188,32 +188,37 @@ python3 traffic-generator/advanced_traffic_generator.py --scenario hallucination
 
 ### Datadog Organization
 
-**Organization Name**: `[YOUR_DATADOG_ORG_NAME]`  
+**Organization Name**: `TODO: Add your Datadog org name`  
 _Note: Update this with your actual Datadog organization name_
 
 ### Detection Rules (Monitors)
 
-We have configured **4 monitors** to detect issues:
+We have configured **6 monitors** to detect LLM-specific issues:
 
 1. **High Latency Alert** (`monitors/high_latency_monitor.json`)
    - Triggers when avg latency > 2000ms for 5 minutes
    - Creates **Incident** with SEV-3
-   - Includes runbook for Vertex AI performance investigation
 
 2. **Error Rate Threshold** (`monitors/error_rate_monitor.json`)
    - Triggers when error rate > 5% in 5 minutes
    - Creates **Incident** with SEV-2
-   - Includes error classification and mitigation steps
 
 3. **Hallucination Score Alert** (`monitors/hallucination_score_monitor.json`)
    - Triggers when hallucination score > 0.7 for 10 minutes
    - Creates **Case** (not incident) for AI team review
-   - Includes sample responses and prompt analysis
+   - ⚠️ *Note: Uses uncertainty phrases as a proxy signal, not a claim of factual correctness*
 
 4. **Quota Exhaustion Alert** (`monitors/quota_exhaustion_monitor.json`)
    - Triggers on 10+ quota errors in 15 minutes
    - Creates **Incident** with SEV-1 (critical)
-   - Emergency response runbook
+
+5. **Prompt Explosion Alert** (`monitors/prompt_explosion_monitor.json`) *[NEW]*
+   - Triggers when avg input tokens > 2000 over 5 minutes
+   - Detects potential abuse or runaway automation
+
+6. **Cost Spike Alert** (`monitors/cost_spike_monitor.json`) *[NEW]*
+   - Triggers when cost per request > $0.01 (30x baseline)
+   - Economic protection for budget overruns
 
 ### Service Level Objectives (SLOs)
 
@@ -343,7 +348,7 @@ Wait 5-10 minutes after each test for monitors to evaluate and check:
 
 ## 📹 Demo Video
 
-**Video URL**: `[YOUR_YOUTUBE_VIDEO_URL]`  
+**Video URL**: `TODO: Add your 3-minute YouTube video URL`  
 _3-minute walkthrough covering:_
 1. Observability strategy overview
 2. Detection rules and rationale
@@ -493,11 +498,11 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 👤 Author
 
-**[Your Name]**  
+**Lokesh Kumar**  
 For the AI Accelerate: Google Cloud Partnerships Hackathon  
 Datadog Challenge
 
-**Datadog Organization**: `[YOUR_ORG_NAME]`
+**Datadog Organization**: `TODO: Add your Datadog org name`
 
 ---
 

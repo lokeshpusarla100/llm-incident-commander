@@ -1,0 +1,121 @@
+{
+    "_note": "Incident templates for LLM Incident Commander - provides actionable context",
+    "templates": [
+        {
+            "id": "llm_latency_degradation",
+            "name": "LLM Latency Degradation",
+            "severity": "SEV-3",
+            "title": "🐢 LLM Response Times Degraded",
+            "summary_template": "LLM response latency has exceeded {{threshold}}ms threshold. Average latency: {{current_value}}ms over the past {{evaluation_window}}.",
+            "impact": {
+                "description": "Users experiencing slow responses from the LLM-powered assistant",
+                "affected_services": [
+                    "llm-incident-commander"
+                ],
+                "customer_impact": "Degraded user experience, potential timeouts"
+            },
+            "context_sections": [
+                {
+                    "title": "📊 Current Metrics",
+                    "content": "- P50 Latency: {{p50_latency}}ms\n- P95 Latency: {{p95_latency}}ms\n- P99 Latency: {{p99_latency}}ms\n- Request Rate: {{request_rate}} req/min"
+                },
+                {
+                    "title": "🔗 Quick Links",
+                    "content": "- [APM Service Dashboard](https://app.datadoghq.com/apm/services/llm-incident-commander)\n- [Recent Traces](https://app.datadoghq.com/apm/traces?query=service:llm-incident-commander)\n- [Vertex AI Console](https://console.cloud.google.com/vertex-ai)"
+                },
+                {
+                    "title": "📋 Runbook",
+                    "content": "1. Check APM traces for slow LLM calls\n2. Review Vertex AI quota usage in GCP Console\n3. Check network latency to Vertex AI endpoints\n4. Verify model configuration (temperature, max_tokens)\n5. Consider scaling or rate limiting if quota-related\n6. Update monitor thresholds if new baseline is appropriate"
+                }
+            ],
+            "postmortem_required": false
+        },
+        {
+            "id": "llm_error_spike",
+            "name": "LLM Error Rate Spike",
+            "severity": "SEV-2",
+            "title": "🚨 LLM Error Rate Elevated",
+            "summary_template": "Error rate for LLM service has exceeded {{threshold}}%. Current rate: {{current_value}}% over the past {{evaluation_window}}.",
+            "impact": {
+                "description": "LLM requests are failing, users unable to get responses",
+                "affected_services": [
+                    "llm-incident-commander"
+                ],
+                "customer_impact": "Service partially or fully unavailable"
+            },
+            "context_sections": [
+                {
+                    "title": "❌ Error Breakdown",
+                    "content": "- Quota Errors: {{quota_errors}}\n- Timeout Errors: {{timeout_errors}}\n- API Errors: {{api_errors}}\n- Total Errors: {{total_errors}}"
+                },
+                {
+                    "title": "🔗 Quick Links",
+                    "content": "- [Error Logs](https://app.datadoghq.com/logs?query=service:llm-incident-commander%20status:error)\n- [APM Errors](https://app.datadoghq.com/apm/services/llm-incident-commander/errors)\n- [GCP Quotas](https://console.cloud.google.com/iam-admin/quotas)"
+                },
+                {
+                    "title": "📋 Runbook",
+                    "content": "1. Identify primary error type from logs\n2. If quota_exceeded: Request quota increase in GCP\n3. If timeout: Check Vertex AI service status\n4. If api_error: Verify authentication credentials\n5. Implement circuit breaker if errors persisting\n6. Communicate status to affected users"
+                }
+            ],
+            "postmortem_required": true
+        },
+        {
+            "id": "llm_cost_spike",
+            "name": "LLM Cost Spike",
+            "severity": "SEV-2",
+            "title": "💰 LLM Cost Spike Detected",
+            "summary_template": "Per-request LLM cost has exceeded {{threshold}}. Current average: ${{current_value}} per request.",
+            "impact": {
+                "description": "LLM usage costs are significantly higher than baseline",
+                "affected_services": [
+                    "llm-incident-commander"
+                ],
+                "customer_impact": "No direct impact, but budget overrun risk"
+            },
+            "context_sections": [
+                {
+                    "title": "💵 Cost Analysis",
+                    "content": "- Current Cost/Request: ${{cost_per_request}}\n- Baseline Cost/Request: $0.0003\n- Multiplier: {{cost_multiplier}}x baseline\n- Input Tokens (avg): {{avg_input_tokens}}\n- Output Tokens (avg): {{avg_output_tokens}}"
+                },
+                {
+                    "title": "🔗 Quick Links",
+                    "content": "- [Token Usage Dashboard](https://app.datadoghq.com/dashboard/llm-observability)\n- [GCP Billing](https://console.cloud.google.com/billing)"
+                },
+                {
+                    "title": "📋 Runbook",
+                    "content": "1. Identify high-cost requests in traces\n2. Check for prompt explosion (large input tokens)\n3. Review max_tokens configuration\n4. Implement input size limits if abuse detected\n5. Alert finance if budget impact > $100\n6. Consider rate limiting expensive consumers"
+                }
+            ],
+            "postmortem_required": false
+        },
+        {
+            "id": "llm_quota_exhausted",
+            "name": "LLM Quota Exhausted",
+            "severity": "SEV-1",
+            "title": "🔥 CRITICAL: Vertex AI Quota Exhausted",
+            "summary_template": "Vertex AI quota has been exhausted. All LLM requests are failing with quota_exceeded errors.",
+            "impact": {
+                "description": "Complete LLM functionality outage due to quota exhaustion",
+                "affected_services": [
+                    "llm-incident-commander"
+                ],
+                "customer_impact": "All users unable to use LLM features"
+            },
+            "context_sections": [
+                {
+                    "title": "🚨 Immediate Status",
+                    "content": "- Service Status: DEGRADED/OUTAGE\n- Quota Errors in Last 15min: {{quota_error_count}}\n- Success Rate: {{success_rate}}%"
+                },
+                {
+                    "title": "🔗 Quick Links",
+                    "content": "- [GCP Quotas Page](https://console.cloud.google.com/iam-admin/quotas)\n- [Request Quota Increase](https://console.cloud.google.com/iam-admin/quotas?project={{project_id}})"
+                },
+                {
+                    "title": "📋 EMERGENCY Runbook",
+                    "content": "1. ⚡ IMMEDIATE: Request emergency quota increase in GCP\n2. Enable fallback model if configured\n3. Implement aggressive rate limiting\n4. Communicate outage to stakeholders\n5. Monitor quota reset schedule\n6. Post-incident: Review quota headroom and alerting"
+                }
+            ],
+            "postmortem_required": true
+        }
+    ]
+}

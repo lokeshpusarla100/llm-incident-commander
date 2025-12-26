@@ -146,7 +146,7 @@ async def health_check():
     try:
         # Quick test with minimal tokens
         with tracer.trace("health_check.vertex_ai_test", service=config.DD_SERVICE):
-            test_response = model.generate_content(
+            test_response = await model.generate_content_async(
                 "ping",
                 generation_config={"max_output_tokens": 5}
             )
@@ -213,7 +213,7 @@ async def ask(req: AskRequest, request: Request):
                 api_span.set_tag("temperature", generation_config["temperature"])
                 api_span.set_tag("max_tokens", generation_config["max_output_tokens"])
                 
-                response = model.generate_content(
+                response = await model.generate_content_async(
                     req.question,
                     generation_config=generation_config
                 )
@@ -351,6 +351,12 @@ async def ask(req: AskRequest, request: Request):
     statsd.gauge("llm.tokens.total", total_tokens)
     statsd.gauge("llm.cost.usd", cost_usd)
     statsd.gauge("llm.hallucination.score", hallucination_score)
+    
+    # Advanced LLM-specific metrics
+    token_efficiency = output_tokens / max(1, input_tokens)  # Output/input ratio
+    statsd.gauge("llm.token_efficiency", token_efficiency)
+    statsd.histogram("llm.response.length", len(answer))  # Response character count
+    statsd.gauge("llm.prompt.complexity", len(req.question.split()))  # Word count
     
     # Add tags to span
     span.set_tag("latency_ms", latency_ms)

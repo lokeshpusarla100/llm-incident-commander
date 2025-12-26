@@ -1,0 +1,29 @@
+{
+    "name": "[Cost Spike] LLM Incident Commander - Request cost exceeds threshold",
+    "type": "metric alert",
+    "query": "avg(last_5m):avg:llm.cost.usd{service:llm-incident-commander} > 0.01",
+    "message": "## 🚨 Cost Spike Detected\n\nPer-request cost has exceeded the expected threshold, indicating potential runaway usage.\n\n**Current Metrics:**\n- Average cost per request: ${{value}} (threshold: $0.01)\n- Service: {{service.name}}\n- Environment: {{env}}\n\n**Potential Causes:**\n- Unusually large prompts or responses\n- Model configuration changes\n- Prompt injection attacks\n- Traffic spike from expensive queries\n\n**Economic Impact:**\n- At current rate: potential budget overrun\n- Baseline cost: ~$0.0003 per request\n- Current: 30x+ baseline\n\n**Context:**\n- [View Cost Dashboard](https://app.datadoghq.com/dashboard)\n- [View Token Usage](https://app.datadoghq.com/metric/explorer?exp_metric=llm.tokens.total)\n\n**Runbook:**\n1. Check token counts (input vs output) in traces\n2. Identify high-cost request patterns\n3. Review prompt engineering changes\n4. Implement cost caps or circuit breakers\n5. Alert finance/ops if budget impact significant\n\n**Immediate Actions:**\n- Consider rate limiting expensive endpoints\n- Review max_tokens configuration\n\n@incident-llm-incident-commander @slack-llm-alerts",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:critical",
+        "category:llm-specific",
+        "type:cost-spike"
+    ],
+    "options": {
+        "thresholds": {
+            "critical": 0.01,
+            "warning": 0.005
+        },
+        "notify_no_data": false,
+        "notify_audit": false,
+        "require_full_window": true,
+        "new_group_delay": 60,
+        "include_tags": true,
+        "escalation_message": "Cost remains elevated. Implement cost controls immediately.",
+        "renotify_interval": 30,
+        "timeout_h": 0,
+        "evaluation_delay": 60
+    },
+    "priority": 2,
+    "restricted_roles": null
+}

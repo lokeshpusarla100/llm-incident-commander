@@ -1,0 +1,29 @@
+{
+    "name": "[Prompt Explosion] LLM Incident Commander - Abnormally large input detected",
+    "type": "metric alert",
+    "query": "avg(last_5m):avg:llm.tokens.input{service:llm-incident-commander} > 2000",
+    "message": "## 🚨 Prompt Explosion Detected\n\nInput prompts are abnormally large, indicating potential abuse or runaway automation.\n\n**Current Metrics:**\n- Average input tokens: {{value}} (threshold: 2000)\n- Service: {{service.name}}\n- Environment: {{env}}\n\n**Potential Causes:**\n- Automated systems injecting excessive context\n- Prompt injection attempts\n- Runaway RAG pipelines\n- Data leakage in prompts\n\n**Context:**\n- [View APM Traces](https://app.datadoghq.com/apm/services/llm-incident-commander)\n- [View Request Logs](https://app.datadoghq.com/logs?query=service:llm-incident-commander)\n\n**Runbook:**\n1. Identify source of large prompts in traces\n2. Check for unusual traffic patterns\n3. Review recent API consumer changes\n4. Implement input size limits if needed\n5. Consider rate limiting by consumer\n\n**Impact:**\n- Increased cost per request\n- Potential latency degradation\n- Quota consumption acceleration\n\n@case-llm-quality-review",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:warning",
+        "category:llm-specific",
+        "type:prompt-explosion"
+    ],
+    "options": {
+        "thresholds": {
+            "critical": 2000,
+            "warning": 1000
+        },
+        "notify_no_data": false,
+        "notify_audit": false,
+        "require_full_window": true,
+        "new_group_delay": 60,
+        "include_tags": true,
+        "escalation_message": "Prompt explosion persists. Review and implement input size limits.",
+        "renotify_interval": 120,
+        "timeout_h": 0,
+        "evaluation_delay": 60
+    },
+    "priority": 3,
+    "restricted_roles": null
+}
