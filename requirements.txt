@@ -66,3 +66,4 @@ zipp==3.23.0
 aiofiles==25.1.0
 MarkupSafe==3.0.3
 langchain-google-vertexai>=1.0.0
+datadog-api-client>=2.0.0

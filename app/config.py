@@ -29,10 +29,9 @@ class Config:
     LLM_TIMEOUT_SECONDS: int = int(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
     
     # Pricing (Gemini 2.0 Flash pricing as of Dec 2024)
-    # Per 1M tokens - https://cloud.google.com/vertex-ai/generative-ai/pricing
     PRICE_PER_1M_INPUT_TOKENS: float = 0.075  # $0.075 per 1M input tokens
     PRICE_PER_1M_OUTPUT_TOKENS: float = 0.30  # $0.30 per 1M output tokens
-    
+
     # SLO Targets (for reference in metrics)
     SLO_LATENCY_TARGET_MS: int = 2000  # 2 seconds
     SLO_AVAILABILITY_TARGET: float = 0.99  # 99%
@@ -44,36 +43,23 @@ class Config:
         "I think", "maybe", "might be wrong", "not sure",
         "I'm not certain", "possibly", "could be", "I guess"
     ]
-    
-    # Retry Configuration (for production resilience)
-    MAX_RETRIES: int = int(os.getenv("LLM_MAX_RETRIES", "3"))
-    RETRY_DELAY_SECONDS: float = float(os.getenv("LLM_RETRY_DELAY", "1.0"))
-    RETRY_BACKOFF_MULTIPLIER: float = float(os.getenv("LLM_RETRY_BACKOFF", "2.0"))
-    
+
     @staticmethod
     def estimate_tokens(text: str) -> int:
         """
-        Estimate token count for text.
-        Approximation: ~4 characters per token for English text.
-        This is a rough estimate - actual tokenization may vary.
+        Estimate token count (fallback).
+        Real usage should come from API response.
         """
         return max(1, len(text) // 4)
     
     @staticmethod
     def calculate_cost(input_tokens: int, output_tokens: int) -> float:
         """
-        Calculate estimated cost in USD for LLM request.
-        
-        Args:
-            input_tokens: Number of input tokens
-            output_tokens: Number of output tokens
-            
-        Returns:
-            Estimated cost in USD
+        Calculate actual cost in USD based on Gemini 2.0 Flash pricing.
         """
         input_cost = (input_tokens / 1_000_000) * Config.PRICE_PER_1M_INPUT_TOKENS
         output_cost = (output_tokens / 1_000_000) * Config.PRICE_PER_1M_OUTPUT_TOKENS
-        return input_cost + output_cost
+        return round(input_cost + output_cost, 9)
     
     # Judge Configuration
     JUDGE_ENABLE_TWO_STAGE: bool = True  # Use two-stage reasoning

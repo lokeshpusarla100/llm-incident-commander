@@ -117,6 +117,10 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
                 response = await model.generate_content_async(req.question, generation_config=generation_config)
                 answer = response.text
                 
+                # ✅ GET REAL TOKENS FROM API RESPONSE
+                input_tokens = response.usage_metadata.prompt_token_count
+                output_tokens = response.usage_metadata.candidates_token_count
+                
             except ResourceExhausted as e:
                 _handle_error(span, request_id, start_time, "quota_exceeded", 429, "Vertex AI quota exceeded", e)
             except DeadlineExceeded as e:
@@ -128,17 +132,20 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
         
         # Post-processing metrics
         latency_ms = int((time.time() - start_time) * 1000)
-        output_tokens = config.estimate_tokens(answer)
         total_tokens = input_tokens + output_tokens
+        # ✅ REAL COST CALCULATION
         cost_usd = config.calculate_cost(input_tokens, output_tokens)
         hallucination_score = calculate_hallucination_score(answer)
         
         # Emit metrics
         statsd.increment("llm.requests.total", tags=["status:success", "model:gemini-2.0-flash"])
         statsd.histogram("llm.latency.ms", latency_ms, tags=["model:gemini-2.0-flash"])
-        statsd.gauge("llm.tokens.input", input_tokens)
-        statsd.gauge("llm.tokens.output", output_tokens)
-        statsd.gauge("llm.cost.usd", cost_usd)
+        statsd.gauge("llm.tokens.input", input_tokens, tags=["model:gemini-2.0-flash"])
+        statsd.gauge("llm.tokens.output", output_tokens, tags=["model:gemini-2.0-flash"])
+        statsd.gauge("llm.tokens.total", total_tokens, tags=["model:gemini-2.0-flash"])
+        statsd.gauge("llm.cost.usd", cost_usd, tags=["model:gemini-2.0-flash", "currency:usd"])
+        statsd.gauge("llm.cost.per_token", cost_usd / max(1, total_tokens), tags=["model:gemini-2.0-flash"])
+        
         statsd.gauge("llm.hallucination.score", hallucination_score)
         
         # Security: PII scan
@@ -157,12 +164,20 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
         
         # Span tags
         span.set_tag("llm.output.completion", answer[:1000])
+        span.set_tag("llm.tokens.prompt", input_tokens)
+        span.set_tag("llm.tokens.completion", output_tokens)
         span.set_tag("llm.tokens.total", total_tokens)
         span.set_tag("llm.cost.usd", cost_usd)
         span.set_tag("llm.grounding.score", grounding["grounding_score"])
         span.set_tag("llm.question.pattern", question_pattern)
         
-        logger.info("LLM request completed", extra={"request_id": request_id, "latency_ms": latency_ms, "cost_usd": cost_usd})
+        logger.info("LLM request completed", extra={
+            "request_id": request_id, 
+            "latency_ms": latency_ms, 
+            "tokens": {"input": input_tokens, "output": output_tokens, "total": total_tokens},
+            "cost_usd": cost_usd,
+            "cost_per_1k_tokens": (cost_usd / max(1, total_tokens)) * 1000
+        })
         
         if hallucination_score >= config.HALLUCINATION_THRESHOLD:
             logger.warning("High hallucination score", extra={"request_id": request_id, "score": hallucination_score})
@@ -177,12 +192,56 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
                 answer=answer,
                 context=context  # Pass actual context from RAG
             )
-            if judge_result and judge_result.get("hallucinations"):
-                logger.info("Judge found hallucinations", extra={
-                    "request_id": request_id,
-                    "hallucination_count": len(judge_result["hallucinations"]),
-                    "hallucinations": judge_result["hallucinations"][:3]
-                })
+            
+            # ✅ AUTO-CREATE INCIDENTS BASED ON JUDGE RESULTS
+            if judge_result:
+                # Log results
+                if judge_result.get("hallucinations"):
+                    logger.info("Judge found hallucinations", extra={
+                        "request_id": request_id,
+                        "hallucination_count": len(judge_result["hallucinations"]),
+                        "hallucinations": judge_result["hallucinations"][:3]
+                    })
+                
+                # Check for high risk hallucination
+                if judge_result.get("hallucination_score", 0) > 0.7:
+                    try:
+                        from app.datadog_incidents import create_incident
+                        create_incident(
+                            title=f"[LLM Quality] High Hallucination Risk - Score {judge_result['hallucination_score']:.2f}",
+                            severity="SEV-3",
+                            fields={
+                                "hallucination_score": judge_result["hallucination_score"],
+                                "hallucination_type": "contradiction" if judge_result.get("contradictions", 0) > judge_result.get("unsupported_claims", 0) else "unsupported",
+                                "grounding_coverage": judge_result["grounding_coverage"],
+                                "contradictions": judge_result.get("contradictions", 0),
+                                "unsupported_claims": judge_result.get("unsupported_claims", 0),
+                                "trace_id": request_id,
+                                "question": req.question[:200],
+                                "response_preview": answer[:200]
+                            },
+                            request_id=request_id
+                        )
+                    except ImportError:
+                        pass
+                
+                # Check for low grounding case
+                if judge_result.get("grounding_coverage", 1.0) < 0.6:
+                    try:
+                        from app.datadog_incidents import create_case
+                        create_case(
+                            title=f"[LLM Quality] Low Grounding Coverage - {judge_result['grounding_coverage']:.0%}",
+                            priority="P3",
+                            fields={
+                                "grounding_coverage": judge_result["grounding_coverage"],
+                                "threshold": 0.6,
+                                "recommendation": "Review knowledge base expansion or RAG retrieval",
+                                "trace_id": request_id
+                            },
+                            request_id=request_id
+                        )
+                    except ImportError:
+                        pass
         
         asyncio.create_task(evaluate_with_judge())
         

@@ -1,0 +1,15 @@
+{
+    "name": "[LLM Economics] Cost per request spike detected",
+    "type": "metric alert",
+    "query": "avg(last_5m):avg:llm.cost.per_token{model:gemini-2.0-flash} > avg(last_1h):avg:llm.cost.per_token{model:gemini-2.0-flash} * 1.5",
+    "message": "## 💰 LLM Cost Anomaly Alert\n\n**What happened:**\nCost per token increased by >50% in the last 5 minutes.\n\n**Metrics:**\n- Current cost/token: {{value}}\n- Historical baseline: {{avg(last_1h):avg:llm.cost.per_token}}\n- Variance: +50%\n\n**Action:**\n- If expected (larger prompts): acknowledge\n- If unexpected: investigate token growth\n\n@cost-management-team",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:warning",
+        "category:economics"
+    ],
+    "options": {
+        "evaluation_delay": 60,
+        "include_tags": true
+    }
+}

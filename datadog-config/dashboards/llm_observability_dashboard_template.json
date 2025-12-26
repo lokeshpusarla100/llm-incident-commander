@@ -127,6 +127,67 @@
             }
         },
         {
+            "id": 600,
+            "definition": {
+                "title": "💰 Cost Tracking & Economics",
+                "type": "timeseries",
+                "requests": [
+                    {
+                        "q": "sum:llm.cost.usd{model:gemini-2.0-flash}.as_count()",
+                        "display_type": "line",
+                        "style": {
+                            "palette": "dog_classic",
+                            "line_type": "solid",
+                            "line_width": "normal"
+                        },
+                        "metadata": {
+                            "alias_name": "Total Cost (USD)"
+                        }
+                    },
+                    {
+                        "q": "avg:llm.cost.per_token{model:gemini-2.0-flash}",
+                        "display_type": "line",
+                        "style": {
+                            "palette": "cool",
+                            "line_type": "dashed",
+                            "line_width": "thin"
+                        },
+                        "metadata": {
+                            "alias_name": "Cost per Token"
+                        }
+                    },
+                    {
+                        "q": "sum:llm.tokens.total{*}.as_count()",
+                        "display_type": "bars",
+                        "style": {
+                            "palette": "warm",
+                            "line_type": "solid",
+                            "line_width": "normal"
+                        },
+                        "metadata": {
+                            "alias_name": "Total Tokens Used"
+                        }
+                    }
+                ],
+                "yaxis": {
+                    "min": 0
+                },
+                "markers": [
+                    {
+                        "value": "avg(llm.cost.per_token) * 1.5",
+                        "label": "Anomaly Threshold",
+                        "type": "error warning"
+                    }
+                ]
+            },
+            "layout": {
+                "x": 0,
+                "y": 12,
+                "width": 12,
+                "height": 4
+            }
+        },
+        {
             "id": 7,
             "definition": {
                 "title": "🔥 High Hallucination Count",

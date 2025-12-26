@@ -1,0 +1,80 @@
+{
+    "incident_templates": [
+        {
+            "id": "llm-hallucination-high-risk",
+            "name": "[LLM Quality] High Hallucination Risk Detected",
+            "severity": "SEV-3",
+            "created_by_monitor": "llm_judge_hallucination_monitor",
+            "description": "LLM response detected with hallucination score > 0.7",
+            "fields": {
+                "detection_method": "LLM-as-a-Judge (two-stage rubric)",
+                "hallucination_type": "{{hallucination_type}}",
+                "hallucination_score": "{{hallucination_score}}",
+                "grounding_coverage": "{{grounding_coverage}}",
+                "contradictions_count": "{{contradictions}}",
+                "unsupported_claims_count": "{{unsupported_claims}}",
+                "trace_id": "{{request_id}}"
+            },
+            "impact": "Response quality degradation. User may receive inaccurate information.",
+            "mitigation_steps": [
+                "1. Review judge logs to understand what claims are hallucinated",
+                "2. Check if context retrieval (Vector Search) is working",
+                "3. Verify knowledge base contains relevant information",
+                "4. Consider updating system prompt with fact-checking instruction",
+                "5. If grounding coverage low: expand knowledge base"
+            ],
+            "runbook": "https://github.com/YOUR_ORG/llm-incident-commander/blob/main/RUNBOOKS.md#hallucination"
+        },
+        {
+            "id": "llm-quota-exhausted",
+            "name": "[LLM Infrastructure] Vertex AI Quota Exhausted",
+            "severity": "SEV-2",
+            "created_by_monitor": "llm_quota_monitor",
+            "description": "Vertex AI API quota limit reached",
+            "fields": {
+                "quota_type": "{{quota_type}}",
+                "reset_time": "{{reset_time}}"
+            },
+            "impact": "LLM inference unavailable. All user requests fail.",
+            "mitigation_steps": [
+                "1. Check quota usage in Vertex AI console",
+                "2. Request quota increase if needed",
+                "3. Implement rate limiting to prevent future exhaustion",
+                "4. Monitor requests_per_minute metric"
+            ]
+        },
+        {
+            "id": "llm-cost-spike",
+            "name": "[LLM Economics] Unexpected Cost Spike",
+            "severity": "SEV-4",
+            "created_by_monitor": "llm_cost_anomaly_monitor",
+            "description": "Cost per request increased by >50%",
+            "fields": {
+                "cost_per_token_before": "{{baseline}}",
+                "cost_per_token_after": "{{current}}",
+                "increase_percent": "{{percent_increase}}"
+            },
+            "impact": "Monthly bill may increase. Requires investigation.",
+            "mitigation_steps": [
+                "1. Check if prompts are getting longer",
+                "2. Check if responses are getting longer",
+                "3. Optimize prompts to reduce token usage",
+                "4. Consider caching frequent queries"
+            ]
+        }
+    ],
+    "case_templates": [
+        {
+            "id": "llm-grounding-coverage-low",
+            "name": "[LLM Quality] Low Grounding Coverage Investigation",
+            "created_by_monitor": "llm_grounding_score_monitor",
+            "description": "LLM responses have low grounding coverage",
+            "priority": "P3",
+            "fields": {
+                "grounding_coverage": "{{grounding_coverage}}",
+                "threshold": "0.6",
+                "recommendation": "Expand knowledge base or improve RAG retrieval"
+            }
+        }
+    ]
+}

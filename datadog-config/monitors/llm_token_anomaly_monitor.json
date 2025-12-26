@@ -1,0 +1,11 @@
+{
+    "name": "[LLM Economics] Unusual token usage pattern detected",
+    "type": "metric alert",
+    "query": "avg(last_10m):avg:llm.tokens.total{*} > avg(last_1h):avg:llm.tokens.total{*} * 1.75",
+    "message": "## 📊 LLM Token Anomaly Alert\n\nToken usage spiked by >75% in last 10 minutes.\n\n**Metrics:**\n- Current avg tokens: {{value}}\n- Baseline: {{avg(last_1h):avg:llm.tokens.total}}\n\n**Investigation:**\n- [View token trend](https://app.datadoghq.com/metric/explorer?query=llm.tokens.total)\n- [Input vs Output breakdown](https://app.datadoghq.com/metric/explorer?query=llm.tokens.input,llm.tokens.output)\n\n@optimization-team",
+    "tags": [
+        "service:llm-incident-commander",
+        "category:economics"
+    ],
+    "priority": 3
+}
