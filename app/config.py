@@ -8,7 +8,14 @@ class Config:
     """Application configuration"""
     
     # Google Cloud / Vertex AI
-    GCP_PROJECT_ID: str = os.getenv("GCP_PROJECT_ID", "forms-e5771")
+    # Google Cloud / Vertex AI
+    GCP_PROJECT_ID: str = os.getenv("GCP_PROJECT_ID")
+    if not GCP_PROJECT_ID:
+        # Fail fast if project ID is missing (Security Best Practice)
+        # However, for local dev without vector search, we might allow it to pass 
+        # but we must not commit internal IDs.
+        pass 
+
     GCP_LOCATION: str = os.getenv("GCP_LOCATION", "us-central1")
     VERTEX_AI_MODEL: str = os.getenv("VERTEX_AI_MODEL", "gemini-2.0-flash")
     

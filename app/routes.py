@@ -212,43 +212,19 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
                 
                 # Check for high risk hallucination
                 if judge_result.get("hallucination_score", 0) > 0.7:
-                    try:
-                        from app.datadog_incidents import create_incident
-                        create_incident(
-                            title=f"[LLM Quality] High Hallucination Risk - Score {judge_result['hallucination_score']:.2f}",
-                            severity="SEV-3",
-                            fields={
-                                "hallucination_score": judge_result["hallucination_score"],
-                                "hallucination_type": "contradiction" if judge_result.get("contradictions", 0) > judge_result.get("unsupported_claims", 0) else "unsupported",
-                                "grounding_coverage": judge_result["grounding_coverage"],
-                                "contradictions": judge_result.get("contradictions", 0),
-                                "unsupported_claims": judge_result.get("unsupported_claims", 0),
-                                "trace_id": request_id,
-                                "question": req.question[:200],
-                                "response_preview": answer[:200]
-                            },
-                            request_id=request_id
-                        )
-                    except ImportError:
-                        pass
+                     logger.warning("High hallucination risk detected via Monitor signal", extra={
+                        "request_id": request_id, 
+                        "score": judge_result["hallucination_score"],
+                        "note": "Incident will be triggered by Datadog Monitor: llm_judge_hallucination_monitor"
+                     })
                 
                 # Check for low grounding case
                 if judge_result.get("grounding_coverage", 1.0) < 0.6:
-                    try:
-                        from app.datadog_incidents import create_case
-                        create_case(
-                            title=f"[LLM Quality] Low Grounding Coverage - {judge_result['grounding_coverage']:.0%}",
-                            priority="P3",
-                            fields={
-                                "grounding_coverage": judge_result["grounding_coverage"],
-                                "threshold": 0.6,
-                                "recommendation": "Review knowledge base expansion or RAG retrieval",
-                                "trace_id": request_id
-                            },
-                            request_id=request_id
-                        )
-                    except ImportError:
-                        pass
+                     logger.warning("Low grounding coverage detected via Monitor signal", extra={
+                        "request_id": request_id,
+                        "coverage": judge_result["grounding_coverage"],
+                        "note": "Case will be triggered by Datadog Monitor: llm_low_grounding_monitor"
+                     })
         
         asyncio.create_task(evaluate_with_judge())
         

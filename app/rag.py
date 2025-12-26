@@ -137,6 +137,8 @@ def retrieve_context(question: str, k: int = 3) -> str:
 
 def _retrieve_context_fallback(question: str) -> str:
     """Fallback using local simple keyword matching"""
+    logger.warning("⚠️ RUNNING IN RAG FALLBACK MODE - VECTOR SEARCH DISABLED ⚠️")
+    
     # Incident knowledge base from previous step for fallback
     INCIDENT_KB = {
         "incident": """Incident is a detected service disruption affecting users...""",

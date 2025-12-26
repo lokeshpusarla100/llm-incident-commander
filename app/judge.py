@@ -59,18 +59,15 @@ async def run_judge_evaluation_two_stage(
         )
         
         
-        # Use async with run_in_executor for blocking call
-        loop = asyncio.get_event_loop()
-        judge_response = await loop.run_in_executor(
-            None,
-            lambda: model.generate_content(
-                prompt,
-                generation_config={
-                    "temperature": 0.0,
-                    "response_mime_type": "application/json",
-                    "max_output_tokens": 512
-                }
-            )
+        
+        # Use native async call for better performance and style
+        judge_response = await model.generate_content_async(
+            prompt,
+            generation_config={
+                "temperature": 0.0,
+                "response_mime_type": "application/json",
+                "max_output_tokens": 512
+            }
         )
         
         # ✅ REAL TOKEN ACCOUNTING FOR JUDGE
