@@ -65,3 +65,4 @@ wrapt==2.0.1
 zipp==3.23.0
 aiofiles==25.1.0
 MarkupSafe==3.0.3
+langchain-google-vertexai>=1.0.0

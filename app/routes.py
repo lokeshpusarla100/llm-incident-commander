@@ -85,8 +85,17 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
         # Experiment variant
         variant = get_experiment_variant(request_id)
         
-        # RAG: Retrieve context from knowledge base
-        context = retrieve_context(req.question)
+        # RAG: Retrieve context from knowledge base (Vector Search)
+        context = retrieve_context(
+            question=req.question,
+            k=3  # Retrieve top 3 similar documents
+        )
+        
+        logger.info("Context retrieved", extra={
+            "question": req.question[:100],
+            "context_length": len(context),
+            "request_id": request_id
+        })
         
         # LLM Generation
         with tracer.trace("llm.generate_content", service=config.DD_SERVICE, resource=config.VERTEX_AI_MODEL) as span:

@@ -13,7 +13,7 @@ logger = setup_logging()
 # Simplified rubric-based judge prompt (single stage for reliability)
 JUDGE_PROMPT = """You are an AI Quality Assurance Judge evaluating if a response is grounded in context.
 
-CONTEXT:
+CONTEXT (Retrieved from Vertex AI Vector Search):
 {context}
 
 USER QUESTION: {question}

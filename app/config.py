@@ -101,6 +101,11 @@ class Config:
     }
     
     CURRENT_SENSITIVITY: str = "balanced"
+    
+    # Vector Search Configuration
+    VECTOR_SEARCH_ENABLED: bool = True
+    VECTOR_SEARCH_K: int = 3  # Number of documents to retrieve
+    VECTOR_SEARCH_EMBEDDING_MODEL: str = "text-embedding-004"
 
 
 config = Config()
