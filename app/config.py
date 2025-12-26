@@ -45,6 +45,11 @@ class Config:
         "I'm not certain", "possibly", "could be", "I guess"
     ]
     
+    # Retry Configuration (for production resilience)
+    MAX_RETRIES: int = int(os.getenv("LLM_MAX_RETRIES", "3"))
+    RETRY_DELAY_SECONDS: float = float(os.getenv("LLM_RETRY_DELAY", "1.0"))
+    RETRY_BACKOFF_MULTIPLIER: float = float(os.getenv("LLM_RETRY_BACKOFF", "2.0"))
+    
     @staticmethod
     def estimate_tokens(text: str) -> int:
         """

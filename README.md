@@ -216,7 +216,7 @@ _Note: Update this with your actual Datadog organization name_
 
 ### Detection Rules (Monitors)
 
-We have configured **7 monitors** to detect LLM-specific issues:
+We have configured **8 monitors** to detect LLM-specific issues:
 
 1. **High Latency Alert** (`monitors/high_latency_monitor.json`)
    - Triggers when avg latency > 2000ms for 5 minutes
@@ -243,9 +243,13 @@ We have configured **7 monitors** to detect LLM-specific issues:
    - Triggers when cost per request > $0.01 (30x baseline)
    - Economic protection for budget overruns
 
-7. **LLM Judge Quality Alert** (`monitors/llm_judge_hallucination_monitor.json`) *[NEW] [INNOVATION]*
+7. **LLM Judge Quality Alert** (`monitors/llm_judge_hallucination_monitor.json`) *[INNOVATION]*
    - Triggers when Judge AI detects semantic hallucination (score > 0.7)
-   - true semantic quality check using Datadog's LLM-as-a-Judge pattern
+   - True semantic quality check using Datadog's LLM-as-a-Judge pattern
+
+8. **Security: Prompt Injection Alert** (`monitors/security_prompt_injection_monitor.json`) *[SECURITY]*
+   - Triggers when 3+ injection attempts detected in 5 minutes
+   - Priority 1 (highest) - creates immediate security incident
 
 ### Service Level Objectives (SLOs)
 

@@ -1,0 +1,28 @@
+{
+    "name": "[LLM Security] Prompt injection attack detected",
+    "type": "metric alert",
+    "query": "sum(last_5m):sum:llm.security.injection_detected{*} > 3",
+    "message": "## 🚨 Security Alert: Potential Prompt Injection Attack\n\n**Detection Summary:**\n- Injection attempts in last 5 minutes: {{value}}\n- Service: {{service.name}}\n- Environment: {{env}}\n\n**What This Means:**\nMultiple requests have been flagged as potential prompt injection attacks based on pattern matching for:\n- Instruction override attempts (\"ignore previous instructions\")\n- Role manipulation (\"pretend to be\", \"act as\")\n- Token stuffing (>2000 character inputs)\n\n**Context:**\n- [View Security Logs](https://app.datadoghq.com/logs?query=service:llm-incident-commander%20injection_risk_score:>0.5)\n- [APM Traces](https://app.datadoghq.com/apm/services/llm-incident-commander)\n\n**Runbook:**\n1. Review logs for `patterns_detected` field\n2. Check if from same IP (coordinated attack)\n3. Block user/IP if confirmed attack\n4. Review system prompt for vulnerabilities\n5. Consider implementing rate limiting\n\n**This creates a HIGH-PRIORITY INCIDENT.**\n\n@security-team @incident-response",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:high",
+        "category:security",
+        "type:prompt-injection"
+    ],
+    "options": {
+        "thresholds": {
+            "critical": 3,
+            "warning": 1
+        },
+        "notify_no_data": false,
+        "notify_audit": false,
+        "require_full_window": false,
+        "new_group_delay": 60,
+        "include_tags": true,
+        "renotify_interval": 30,
+        "timeout_h": 0,
+        "evaluation_delay": 60
+    },
+    "priority": 1,
+    "restricted_roles": null
+}

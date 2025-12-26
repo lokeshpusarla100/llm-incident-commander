@@ -5,6 +5,8 @@ import time
 import uuid
 import asyncio
 import json
+import re
+import hashlib
 from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -95,6 +97,166 @@ class HealthResponse(BaseModel):
 # Track application start time for uptime
 app_start_time = time.time()
 
+
+# ============================================================================
+# SECURITY SCANNING FUNCTIONS
+# ============================================================================
+
+def scan_for_prompt_injection(question: str) -> dict:
+    """
+    Detect potential prompt injection attacks.
+    Returns risk score and detected patterns.
+    """
+    risk_score = 0.0
+    patterns_detected = []
+    
+    # Pattern 1: Instruction override attempts
+    override_patterns = [
+        r"ignore (previous|all) instructions",
+        r"disregard (the|your) (system|above) prompt",
+        r"new instructions?:",
+        r"you are now",
+        r"forget (what|everything) (you|i) (told|said)"
+    ]
+    for pattern in override_patterns:
+        if re.search(pattern, question.lower()):
+            risk_score += 0.4
+            patterns_detected.append(f"override_attempt: {pattern}")
+    
+    # Pattern 2: Role manipulation
+    role_patterns = [
+        r"you are (a|an) (hacker|attacker|villain)",
+        r"act as (if )?you (are|were)",
+        r"pretend (to be|you are)"
+    ]
+    for pattern in role_patterns:
+        if re.search(pattern, question.lower()):
+            risk_score += 0.3
+            patterns_detected.append(f"role_manipulation: {pattern}")
+    
+    # Pattern 3: Excessive length (potential token stuffing)
+    if len(question) > 2000:
+        risk_score += 0.3
+        patterns_detected.append(f"excessive_length: {len(question)} chars")
+    
+    return {
+        "injection_risk_score": min(1.0, risk_score),
+        "patterns_detected": patterns_detected,
+        "is_suspicious": risk_score >= 0.5
+    }
+
+
+def scan_for_pii_leakage(response: str) -> dict:
+    """Detect PII in LLM responses"""
+    pii_found = []
+    
+    # Email addresses
+    if re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', response):
+        pii_found.append("email")
+    
+    # Phone numbers (US format)
+    if re.search(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', response):
+        pii_found.append("phone")
+    
+    # SSN pattern
+    if re.search(r'\b\d{3}-\d{2}-\d{4}\b', response):
+        pii_found.append("ssn")
+    
+    # Credit card (simple check)
+    if re.search(r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b', response):
+        pii_found.append("credit_card")
+    
+    return {
+        "pii_types_found": pii_found,
+        "has_pii": len(pii_found) > 0,
+        "pii_count": len(pii_found)
+    }
+
+
+# ============================================================================
+# CUSTOM EVALUATION FUNCTIONS
+# ============================================================================
+
+def evaluate_incident_response_quality(question: str, response: str) -> dict:
+    """
+    Custom evaluation for incident response quality.
+    Checks if response contains key incident metadata.
+    """
+    score = 0.0
+    reasons = []
+    
+    # Check 1: Response mentions incident ID
+    if any(word in response.lower() for word in ["incident", "issue", "#"]):
+        score += 0.33
+    else:
+        reasons.append("No incident reference")
+    
+    # Check 2: Response provides actionable steps
+    action_words = ["restart", "check", "verify", "review", "analyze", "investigate", "monitor", "debug"]
+    if any(word in response.lower() for word in action_words):
+        score += 0.33
+    else:
+        reasons.append("No actionable steps")
+    
+    # Check 3: Response has sufficient detail (>50 words)
+    word_count = len(response.split())
+    if word_count >= 50:
+        score += 0.34
+    else:
+        reasons.append(f"Too brief ({word_count} words)")
+    
+    return {
+        "incident_response_quality": round(score, 2),
+        "word_count": word_count,
+        "has_incident_ref": score >= 0.33,
+        "has_action_items": score >= 0.66,
+        "reasons": reasons
+    }
+
+
+# ============================================================================
+# RAG PIPELINE PLACEHOLDER (Future-proofing)
+# ============================================================================
+
+def retrieve_context(question: str) -> str:
+    """
+    Placeholder for future RAG implementation.
+    When implemented, this will retrieve relevant docs from vector DB.
+    """
+    with tracer.trace("llm.retrieval", service=config.DD_SERVICE) as span:
+        span.set_tag("retrieval.query", question[:100])
+        span.set_tag("retrieval.source", "none")  # Will be "pinecone" or "weaviate" later
+        span.set_tag("retrieval.chunks", 0)
+        return ""  # No context for now
+
+
+# ============================================================================
+# EXPERIMENT TRACKING
+# ============================================================================
+
+EXPERIMENT_VARIANTS = {
+    "control": {"temperature": 0.7, "system_prompt": ""},
+    "variant_a": {"temperature": 0.3, "system_prompt": "Be concise and actionable."},
+    "variant_b": {"temperature": 0.9, "system_prompt": "Be creative in troubleshooting."}
+}
+
+
+def get_experiment_variant(request_id: str) -> str:
+    """Assign user to experiment variant based on request ID hash"""
+    hash_val = int(hashlib.md5(request_id.encode()).hexdigest(), 16)
+    bucket = hash_val % 100
+    
+    if bucket < 20:
+        return "control"
+    elif bucket < 60:
+        return "variant_a"
+    else:
+        return "variant_b"
+
+
+# ============================================================================
+# HALLUCINATION DETECTION (Legacy keyword-based)
+# ============================================================================
 
 def calculate_hallucination_score(text: str) -> float:
     """
@@ -316,19 +478,50 @@ async def ask(req: AskRequest, request: Request):
         }
     )
     
+    # ========================================================================
+    # PRE-PROCESSING: Security Scanning & Experiment Assignment
+    # ========================================================================
+    
+    # Security: Scan for prompt injection attacks
+    injection_scan = scan_for_prompt_injection(req.question)
+    statsd.gauge(
+        "llm.security.injection_risk",
+        injection_scan["injection_risk_score"],
+        tags=[f"request_id:{request_id}"]
+    )
+    
+    if injection_scan["is_suspicious"]:
+        logger.warning(
+            "Potential prompt injection detected",
+            extra={"request_id": request_id, **injection_scan}
+        )
+        statsd.increment("llm.security.injection_detected")
+    
+    # Experiment: Assign variant for A/B testing
+    variant = get_experiment_variant(request_id)
+    variant_config = EXPERIMENT_VARIANTS[variant]
+    
+    # RAG: Retrieve context (placeholder for future implementation)
+    context = retrieve_context(req.question)
+    
     # Create custom span for the entire LLM operation
     with tracer.trace(
         "llm.generate_content",
         service=config.DD_SERVICE,
         resource=config.VERTEX_AI_MODEL
     ) as span:
-        span.set_tag("request_id", request_id)
-        span.set_tag("question_length", len(req.question))
-        span.set_tag("model", config.VERTEX_AI_MODEL)
+        # Enhanced prompt/response tracing (Datadog LLM Observability format)
+        span.set_tag("llm.input.prompt", req.question[:1000])  # Truncate for storage
+        span.set_tag("llm.input.temperature", req.temperature or config.LLM_TEMPERATURE)
+        span.set_tag("llm.input.max_tokens", req.max_tokens or config.LLM_MAX_OUTPUT_TOKENS)
+        span.set_tag("llm.model", config.VERTEX_AI_MODEL)
+        span.set_tag("llm.provider", "google")
+        span.set_tag("llm.request_id", request_id)
+        span.set_tag("experiment.variant", variant)
+        span.set_tag("security.injection_risk", injection_scan["injection_risk_score"])
         
         # Estimate input tokens
         input_tokens = config.estimate_tokens(req.question)
-        span.set_tag("input_tokens_estimated", input_tokens)
         
         try:
             # Generate content with timeout handling
@@ -486,12 +679,44 @@ async def ask(req: AskRequest, request: Request):
     statsd.histogram("llm.response.length", len(answer))  # Response character count
     statsd.gauge("llm.prompt.complexity", len(req.question.split()))  # Word count
     
-    # Add tags to span
-    span.set_tag("latency_ms", latency_ms)
-    span.set_tag("output_tokens_estimated", output_tokens)
-    span.set_tag("total_tokens", total_tokens)
-    span.set_tag("cost_usd", cost_usd)
-    span.set_tag("hallucination_score", hallucination_score)
+    # ========================================================================
+    # POST-PROCESSING: Security, Quality Evaluation & Enhanced Tracing
+    # ========================================================================
+    
+    # Security: Scan for PII leakage in response
+    pii_scan = scan_for_pii_leakage(answer)
+    if pii_scan["has_pii"]:
+        logger.warning(
+            "PII detected in LLM response",
+            extra={"request_id": request_id, **pii_scan}
+        )
+        statsd.increment(
+            "llm.security.pii_leaked",
+            tags=[f"pii_type:{','.join(pii_scan['pii_types_found'])}"]
+        )
+    
+    # Custom Evaluation: Incident response quality scoring
+    quality_eval = evaluate_incident_response_quality(req.question, answer)
+    statsd.gauge(
+        "llm.quality.incident_response_score",
+        quality_eval["incident_response_quality"],
+        tags=[f"request_id:{request_id}", f"experiment_variant:{variant}"]
+    )
+    statsd.gauge(
+        "llm.quality.word_count",
+        quality_eval["word_count"],
+        tags=[f"request_id:{request_id}"]
+    )
+    
+    # Add enhanced output tags to span (Datadog LLM Observability format)
+    span.set_tag("llm.output.completion", answer[:1000])  # Truncate for storage
+    span.set_tag("llm.output.finish_reason", "stop")
+    span.set_tag("llm.tokens.prompt", input_tokens)
+    span.set_tag("llm.tokens.completion", output_tokens)
+    span.set_tag("llm.tokens.total", total_tokens)
+    span.set_tag("llm.cost.usd", cost_usd)
+    span.set_tag("llm.latency.ms", latency_ms)
+    span.set_tag("llm.quality.score", quality_eval["incident_response_quality"])
     span.set_tag("success", True)
     
     # Log successful request
