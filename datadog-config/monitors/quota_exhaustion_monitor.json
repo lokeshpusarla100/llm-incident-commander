@@ -1,0 +1,27 @@
+{
+    "name": "[CRITICAL] LLM Incident Commander - Vertex AI quota exhausted",
+    "type": "metric alert",
+    "query": "sum(last_15m):sum:llm.errors.total{service:llm-incident-commander,error_type:quota_exceeded}.as_count() > 10",
+    "message": "## 🚨 CRITICAL: Vertex AI Quota Exhausted\n\nThe application is repeatedly hitting Vertex AI quota limits.\n\n**Current State:**\n- Quota errors: {{value}} in last 15 minutes\n- Service: {{service.name}}\n\n**Immediate Impact:**\n- Users receiving 429 errors\n- Service degraded/unavailable\n\n**Context:**\n- [Google Cloud Console - Quotas](https://console.cloud.google.com/iam-admin/quotas)\n- [Error Logs](https://app.datadoghq.com/logs?query=error_type:quota_exceeded)\n\n**Runbook:**\n1. Check Google Cloud Console quotas\n2. Request quota increase if justified\n3. Implement rate limiting immediately\n4. Consider queuing requests\n5. Review traffic patterns for abuse\n\n**Immediate Actions:**\n- Enable rate limiting\n- Notify stakeholders of degraded service\n- Request emergency quota increase\n\n@incident-llm-incident-commander @oncall-engineering",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:critical",
+        "category:quota"
+    ],
+    "options": {
+        "thresholds": {
+            "critical": 10
+        },
+        "notify_no_data": false,
+        "notify_audit": false,
+        "require_full_window": true,
+        "new_group_delay": 60,
+        "include_tags": true,
+        "escalation_message": "Quota exhaustion persists. Emergency response required.",
+        "renotify_interval": 15,
+        "timeout_h": 0,
+        "evaluation_delay": 60
+    },
+    "priority": 1,
+    "restricted_roles": null
+}

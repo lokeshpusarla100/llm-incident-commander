@@ -1,0 +1,42 @@
+{
+    "_note": "Template SLO configuration – can be imported into Datadog",
+    "name": "LLM Error Rate SLO (< 1%)",
+    "description": "Ensures less than 1% of LLM requests result in errors over a 7-day rolling window.",
+    "tags": [
+        "service:llm-incident-commander",
+        "env:production",
+        "team:ai-engineering"
+    ],
+    "thresholds": [
+        {
+            "timeframe": "7d",
+            "target": 99.0,
+            "warning": 99.5
+        }
+    ],
+    "type": "metric",
+    "query": {
+        "numerator": "sum:llm.requests.total{service:llm-incident-commander,status:success}.as_count()",
+        "denominator": "sum:llm.requests.total{service:llm-incident-commander}.as_count()"
+    },
+    "monitor_ids": [],
+    "groups": [
+        "service",
+        "error_type"
+    ],
+    "target_threshold": 99.0,
+    "warning_threshold": 99.5,
+    "timeframe": "7d",
+    "error_budget": {
+        "description": "1% error budget over 7 days",
+        "budget_percent": 1.0
+    },
+    "error_types_tracked": [
+        "quota_exhaustion",
+        "timeout",
+        "api_error",
+        "validation_error",
+        "rate_limit"
+    ],
+    "rationale": "A 1% error rate threshold ensures users rarely experience failures. LLM APIs can fail due to quota exhaustion, rate limiting, or transient errors. This SLO catches systemic issues before impacting user trust."
+}

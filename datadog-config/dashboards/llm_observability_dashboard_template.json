@@ -1,0 +1,229 @@
+{
+    "_note": "Template Dashboard configuration – can be imported into Datadog",
+    "title": "LLM Incident Commander - Observability",
+    "description": "Comprehensive observability dashboard for LLM application powered by Vertex AI (Gemini). Tracks latency, tokens, cost, quality, and errors.",
+    "widgets": [
+        {
+            "id": 1,
+            "definition": {
+                "title": "📊 LLM Request Rate",
+                "type": "timeseries",
+                "requests": [
+                    {
+                        "q": "sum:llm.requests.total{service:llm-incident-commander}.as_rate()",
+                        "display_type": "bars",
+                        "style": {
+                            "palette": "dog_classic"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": 2,
+            "definition": {
+                "title": "⚡ Latency (P50 / P95 / P99)",
+                "type": "timeseries",
+                "requests": [
+                    {
+                        "q": "avg:llm.latency.ms{service:llm-incident-commander}",
+                        "display_type": "line",
+                        "style": {
+                            "palette": "cool"
+                        }
+                    },
+                    {
+                        "q": "p95:llm.latency.ms{service:llm-incident-commander}",
+                        "display_type": "line"
+                    },
+                    {
+                        "q": "p99:llm.latency.ms{service:llm-incident-commander}",
+                        "display_type": "line"
+                    }
+                ],
+                "yaxis": {
+                    "label": "milliseconds"
+                }
+            }
+        },
+        {
+            "id": 3,
+            "definition": {
+                "title": "🎯 Token Usage",
+                "type": "timeseries",
+                "requests": [
+                    {
+                        "q": "sum:llm.tokens.input{service:llm-incident-commander}.as_count()",
+                        "display_type": "area",
+                        "style": {
+                            "palette": "purple"
+                        }
+                    },
+                    {
+                        "q": "sum:llm.tokens.output{service:llm-incident-commander}.as_count()",
+                        "display_type": "area",
+                        "style": {
+                            "palette": "orange"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": 4,
+            "definition": {
+                "title": "💰 Estimated Cost (USD)",
+                "type": "query_value",
+                "requests": [
+                    {
+                        "q": "sum:llm.cost.usd{service:llm-incident-commander}.as_count()",
+                        "aggregator": "sum"
+                    }
+                ],
+                "precision": 6,
+                "text_align": "center"
+            }
+        },
+        {
+            "id": 5,
+            "definition": {
+                "title": "🧠 Hallucination Score (Quality)",
+                "type": "timeseries",
+                "requests": [
+                    {
+                        "q": "avg:llm.hallucination.score{service:llm-incident-commander}",
+                        "display_type": "line",
+                        "style": {
+                            "palette": "warm"
+                        }
+                    }
+                ],
+                "markers": [
+                    {
+                        "value": "y = 0.7",
+                        "display_type": "error dashed",
+                        "label": "Quality Threshold"
+                    }
+                ]
+            }
+        },
+        {
+            "id": 6,
+            "definition": {
+                "title": "❌ Error Rate",
+                "type": "timeseries",
+                "requests": [
+                    {
+                        "q": "sum:llm.errors.total{service:llm-incident-commander}.as_rate() / sum:llm.requests.total{service:llm-incident-commander}.as_rate() * 100",
+                        "display_type": "line",
+                        "style": {
+                            "palette": "red"
+                        }
+                    }
+                ],
+                "yaxis": {
+                    "label": "error %"
+                }
+            }
+        },
+        {
+            "id": 7,
+            "definition": {
+                "title": "🔥 High Hallucination Count",
+                "type": "query_value",
+                "requests": [
+                    {
+                        "q": "sum:llm.hallucination.high_score{service:llm-incident-commander}.as_count()",
+                        "aggregator": "sum"
+                    }
+                ],
+                "precision": 0
+            }
+        },
+        {
+            "id": 8,
+            "definition": {
+                "title": "📈 SLO Status - Availability",
+                "type": "slo",
+                "slo_id": "availability_slo",
+                "time_windows": [
+                    "30d"
+                ],
+                "show_error_budget": true
+            }
+        },
+        {
+            "id": 9,
+            "definition": {
+                "title": "📈 SLO Status - Latency",
+                "type": "slo",
+                "slo_id": "latency_slo",
+                "time_windows": [
+                    "7d"
+                ],
+                "show_error_budget": true
+            }
+        },
+        {
+            "id": 10,
+            "definition": {
+                "title": "📈 SLO Status - Error Rate",
+                "type": "slo",
+                "slo_id": "error_rate_slo",
+                "time_windows": [
+                    "7d"
+                ],
+                "show_error_budget": true
+            }
+        },
+        {
+            "id": 11,
+            "definition": {
+                "title": "🚨 Active Incidents",
+                "type": "alert_graph",
+                "alert_id": "high_latency_monitor",
+                "viz_type": "timeseries"
+            }
+        },
+        {
+            "id": 12,
+            "definition": {
+                "title": "📋 Recent Logs",
+                "type": "log_stream",
+                "query": "service:llm-incident-commander",
+                "columns": [
+                    "timestamp",
+                    "level",
+                    "message"
+                ],
+                "show_date_column": true
+            }
+        },
+        {
+            "id": 13,
+            "definition": {
+                "title": "🔍 APM Service Overview",
+                "type": "servicemap",
+                "service": "llm-incident-commander",
+                "filters": [
+                    "env:production"
+                ]
+            }
+        }
+    ],
+    "template_variables": [
+        {
+            "name": "env",
+            "default": "production",
+            "prefix": "env"
+        },
+        {
+            "name": "service",
+            "default": "llm-incident-commander",
+            "prefix": "service"
+        }
+    ],
+    "layout_type": "ordered",
+    "notify_list": [],
+    "reflow_type": "fixed"
+}

@@ -1,0 +1,28 @@
+{
+    "name": "[High Latency] LLM Incident Commander - Response time degraded",
+    "type": "metric alert",
+    "query": "avg(last_5m):avg:llm.latency.ms{service:llm-incident-commander} > 2000",
+    "message": "## 🚨 High Latency Detected\n\nThe LLM Incident Commander is experiencing degraded response times.\n\n**Current Metrics:**\n- Average latency: {{value}}ms (threshold: 2000ms)\n- Service: {{service.name}}\n- Environment: {{env}}\n\n**Context:**\n- [View APM Traces](https://app.datadoghq.com/apm/services/llm-incident-commander)\n- Time range: {{last_triggered_at}}\n\n**Runbook:**\n1. Check APM traces for slow LLM calls\n2. Review Vertex AI quota usage and limits\n3. Verify network connectivity to Vertex AI\n4. Check if model performance has degraded\n5. Consider implementing rate limiting or caching\n\n**Next Steps:**\n- Investigate root cause using trace data\n- Implement mitigation if quota-related\n- Update detection thresholds if needed\n\n@incident-llm-incident-commander",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:warning",
+        "category:performance"
+    ],
+    "options": {
+        "thresholds": {
+            "critical": 2000,
+            "warning": 1500
+        },
+        "notify_no_data": false,
+        "notify_audit": false,
+        "require_full_window": true,
+        "new_group_delay": 60,
+        "include_tags": true,
+        "escalation_message": "Latency issue persists. Please investigate immediately.",
+        "renotify_interval": 60,
+        "timeout_h": 0,
+        "evaluation_delay": 60
+    },
+    "priority": 3,
+    "restricted_roles": null
+}

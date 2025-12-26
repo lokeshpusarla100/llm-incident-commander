@@ -1,0 +1,34 @@
+{
+    "_note": "Template SLO configuration – can be imported into Datadog",
+    "name": "LLM Availability SLO",
+    "description": "Ensures 99% of LLM requests are successful (HTTP 2xx/3xx responses) over a 30-day rolling window.",
+    "tags": [
+        "service:llm-incident-commander",
+        "env:production",
+        "team:ai-engineering"
+    ],
+    "thresholds": [
+        {
+            "timeframe": "30d",
+            "target": 99.0,
+            "warning": 99.5
+        }
+    ],
+    "type": "metric",
+    "query": {
+        "numerator": "sum:llm.requests.total{service:llm-incident-commander,status:success}.as_count()",
+        "denominator": "sum:llm.requests.total{service:llm-incident-commander}.as_count()"
+    },
+    "monitor_ids": [],
+    "groups": [
+        "service"
+    ],
+    "target_threshold": 99.0,
+    "warning_threshold": 99.5,
+    "timeframe": "30d",
+    "error_budget": {
+        "description": "1% error budget (~7.2 hours/month of allowed failures)",
+        "budget_percent": 1.0
+    },
+    "rationale": "99% availability is industry standard for production LLM services. This SLO ensures the application reliably serves user requests without API failures, quota exhaustion, or infrastructure issues."
+}

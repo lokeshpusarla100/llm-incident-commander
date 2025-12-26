@@ -1,0 +1,34 @@
+{
+    "_note": "Template SLO configuration – can be imported into Datadog",
+    "name": "LLM Latency SLO (P95 < 2s)",
+    "description": "Ensures 95% of LLM requests complete in under 2000ms (2 seconds) over a 7-day rolling window.",
+    "tags": [
+        "service:llm-incident-commander",
+        "env:production",
+        "team:ai-engineering"
+    ],
+    "thresholds": [
+        {
+            "timeframe": "7d",
+            "target": 95.0,
+            "warning": 97.0
+        }
+    ],
+    "type": "metric",
+    "query": {
+        "numerator": "sum:llm.requests.total{service:llm-incident-commander,latency_bucket:under_2s}.as_count()",
+        "denominator": "sum:llm.requests.total{service:llm-incident-commander}.as_count()"
+    },
+    "monitor_ids": [],
+    "groups": [
+        "service"
+    ],
+    "target_threshold": 95.0,
+    "warning_threshold": 97.0,
+    "timeframe": "7d",
+    "error_budget": {
+        "description": "5% error budget (~8.4 hours/week of allowed slow requests)",
+        "budget_percent": 5.0
+    },
+    "rationale": "2 seconds is the maximum acceptable latency for interactive LLM applications based on user experience research. Gemini 2.0 Flash typically responds in 200-800ms, so this threshold catches degradation while allowing for complex queries."
+}
