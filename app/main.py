@@ -3,6 +3,8 @@ LLM Incident Commander - FastAPI application with Vertex AI and Datadog observab
 """
 import time
 import uuid
+import asyncio
+import json
 from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -108,9 +110,135 @@ def calculate_hallucination_score(text: str) -> float:
     text_lower = text.lower()
     hits = sum(1 for flag in config.HALLUCINATION_RED_FLAGS if flag.lower() in text_lower)
     
-    # Normalize score: 3+ red flags = maximum score
     score = min(1.0, hits / 3.0)
     return round(score, 3)
+
+
+# LLM-as-a-Judge prompt for semantic hallucination detection
+JUDGE_PROMPT = """You are an AI Quality Assurance Judge evaluating response accuracy.
+
+USER QUESTION: "{question}"
+AI RESPONSE: "{response}"
+
+Evaluate the response for these issues:
+1. **Hallucination**: Makes unfounded claims, cites non-existent facts, or provides information without basis
+2. **Uncertainty**: Uses excessive hedging language indicating the model is guessing
+3. **Evasiveness**: Avoids directly answering the question or gives overly generic responses
+4. **Contradictions**: Contains logically inconsistent or self-contradicting statements
+
+Scoring guidelines:
+- 0.0-0.3: Confident, factual, directly answers question
+- 0.4-0.6: Contains some hedging language but generally accurate
+- 0.7-0.9: Significant uncertainty, evasiveness, or potential inaccuracies
+- 1.0: Clear hallucination, completely fabricated information, or nonsensical response
+
+Respond with ONLY this exact JSON structure (no markdown, no extra text):
+{{
+  "hallucination_score": <float between 0.0 and 1.0>,
+  "has_uncertainty_phrases": <boolean>,
+  "has_contradictions": <boolean>,
+  "is_evasive": <boolean>,
+  "reasoning": "<one sentence explanation of the score>"
+}}
+"""
+
+
+async def run_judge_evaluation(request_id: str, question: str, response: str):
+    """
+    Runs an async evaluation using a separate LLM call.
+    Emits the 'llm.judge.score' metric to Datadog.
+    """
+    try:
+        # Create a new, separate generation request for the judge
+        # Use a lower temperature for the judge to ensure consistency
+        logger.info(f"Starting judge evaluation for request {request_id}")
+        
+        # Estimate input tokens for judge to track cost
+        judge_input_text = JUDGE_PROMPT.format(question=question, response=response)
+        input_tokens = config.estimate_tokens(judge_input_text)
+        
+        judge_response = await model.generate_content_async(
+            judge_input_text,
+            generation_config={"temperature": 0.0, "response_mime_type": "application/json"}
+        )
+        
+        # Parse JSON
+        try:
+            eval_data = json.loads(judge_response.text)
+            
+            # Extract metrics
+            score = float(eval_data.get("hallucination_score", 0.0))
+            has_uncertainty = eval_data.get("has_uncertainty_phrases", False)
+            has_contradictions = eval_data.get("has_contradictions", False)
+            is_evasive = eval_data.get("is_evasive", False)
+            reasoning = eval_data.get("reasoning", "No reasoning provided")
+            
+            # Estimate token usage and calculate cost
+            output_tokens = config.estimate_tokens(judge_response.text)
+            total_tokens = input_tokens + output_tokens
+            judge_cost = config.calculate_cost(input_tokens, output_tokens)
+            
+            # Emit metrics to Datadog
+            statsd.gauge(
+                "llm.judge.hallucination_score", 
+                score, 
+                tags=[
+                    f"request_id:{request_id}", 
+                    "model:gemini-2.0-flash", 
+                    "role:judge"
+                ]
+            )
+            
+            statsd.gauge(
+                "llm.judge.cost.usd",
+                judge_cost,
+                tags=["model:gemini-2.0-flash", "role:judge"]
+            )
+            
+            statsd.gauge(
+                "llm.judge.tokens.total",
+                total_tokens,
+                tags=["model:gemini-2.0-flash", "role:judge"]
+            )
+            
+            # Track high risk
+            if score >= 0.7:
+                logger.warning(
+                    "High hallucination risk detected by judge",
+                    extra={
+                        "request_id": request_id,
+                        "judge_score": score,
+                        "reasoning": reasoning,
+                        "user_question": question[:200],
+                        "llm_response": response[:200]
+                    }
+                )
+                statsd.increment(
+                    "llm.judge.high_risk_detected", 
+                    tags=["model:gemini-2.0-flash", "severity:high"]
+                )
+            
+            logger.info(
+                "Judge evaluation completed", 
+                extra={
+                    "request_id": request_id,
+                    "judge_score": score,
+                    "has_uncertainty": has_uncertainty,
+                    "has_contradictions": has_contradictions,
+                    "is_evasive": is_evasive,
+                    "reasoning": reasoning,
+                    "judge_cost_usd": judge_cost,
+                    "judge_tokens": total_tokens
+                }
+            )
+            
+        except json.JSONDecodeError:
+            logger.error(f"Judge returned invalid JSON for request {request_id}: {judge_response.text}")
+            statsd.increment("llm.judge.errors", tags=["error_type:json_parse", "model:gemini-2.0-flash"])
+
+    except Exception as e:
+        logger.error(f"Judge evaluation failed for request {request_id}: {e}")
+        statsd.increment("llm.judge.errors", tags=["error_type:unknown", "model:gemini-2.0-flash"])
 
 
 @app.middleware("http")
@@ -393,6 +521,12 @@ async def ask(req: AskRequest, request: Request):
             }
         )
         statsd.increment("llm.hallucination.high_score", tags=["model:gemini-2.0-flash"])
+    
+    # FIRE AND FORGET: Schedule the judge to run in the background
+    # This ensures the user doesn't wait for the extra API call
+    asyncio.create_task(
+        run_judge_evaluation(request_id, req.question, answer)
+    )
     
     return AskResponse(
         request_id=request_id,

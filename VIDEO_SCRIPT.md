@@ -1,138 +1,50 @@
-# LLM Incident Commander - Video Script
+# LLM Incident Commander - Video Demo Script
 
-**Total Duration: 3 minutes**
+## Section 1: Introduction (30 seconds)
+"Hi, I'm Lokesh Kumar and this is LLM Incident Commander - an observability-first AI assistant built for the Datadog AI Accelerate Challenge."
 
----
+**[Screen: Show Architecture Diagram in README]**
 
-## Opening (0:00 - 0:20)
+"We built a production-grade FastAPI application using Vertex AI's Gemini 2.0 Flash to help SREs troubleshoot incidents. But the real story is the Observability."
 
-**[Screen: Dashboard Overview]**
+## Section 2: Observability & Dashboards (60 seconds)
+**[Screen: Show Datadog Dashboard]**
 
-> "Hi! I'm presenting LLM Incident Commander for the Datadog Challenge. This is an intelligent incident management system powered by Vertex AI with end-to-end observability. Let me show you what makes this solution innovative."
+"Here in Datadog, we have a comprehensive operational dashboard. It's not just basic stats; we track:
+- **LLM Health Status**: A unified RAG status indicator
+- **Token Efficiency**: Monitoring input/output ratios
+- **Cost Per Request**: Real-time economic tracking"
 
----
+"We implemented 6 different monitors, including detection for **Prompt Explosions** and **Cost Spikes**."
 
-## Part 1: The Problem & Solution (0:20 - 0:50)
+## Section 3: LLM-as-a-Judge Innovation (30 seconds)
 
-**[Screen: Architecture Diagram]**
+**[Screen: Show Datadog dashboard with llm.judge.* metrics]**
 
-> "LLM applications face unique challenges: unpredictable latency, quota limits, and most critically - quality degradation through hallucinations. My observability strategy addresses all three."
+"Unlike simple keyword matching, we implemented Datadog's recommended LLM-as-a-Judge architecture."
 
-**[Screen: Application Code showing hallucination detection]**
+**[Point to llm.judge.hallucination_score graph]**
 
-> "I've implemented custom metrics including a hallucination score that analyzes response uncertainty, real-time cost tracking per request, and comprehensive error categorization."
+"A second Gemini instance runs asynchronously in the background, evaluating every response for semantic accuracy, contradictions, and evasiveness."
 
----
+**[Show logs with judge reasoning]**
 
-## Part 2: Detection Rules (0:50 - 1:30)
+"This creates the `llm.judge.hallucination_score` metric you see here - a true measure of quality, not just linguistic cues."
 
-**[Screen: Monitors Page]**
+**[Show monitor triggering]**
 
-> "I've configured four detection rules, each with detailed runbooks:"
+"When the judge detects issues, it creates a Case in Datadog for AI team review, including the judge's reasoning."
 
-1. **High Latency Monitor** *(0:55)*
-   > "First, latency monitoring. When average response time exceeds 2 seconds for 5 minutes, it triggers an incident with full APM trace context."
+**[Quick point to Datadog blog reference in monitor]**
 
-2. **Error Rate Monitor** *(1:05)*
-   > "Second, error rate tracking. Above 5% error rate triggers a critical incident with error logs and type classification - quota, timeout, or API errors."
+"This pattern mirrors what Datadog's own LLM Observability product offers, proving it's achievable with Vertex AI."
 
-3. **Hallucination Score Monitor** *(1:15)*
-   > "Third - and this is unique - quality monitoring. High hallucination scores create a case for AI engineering review, not an urgent incident, because it needs analysis not immediate action."
+## Section 4: Incident Management (30 seconds)
+**[Screen: Trigger an incident via traffic generator]**
 
-4. **Quota Exhaustion** *(1:25)*
-   > "Finally, proactive quota monitoring prevents service outages."
+"Let's simulate a high-latency event. Watch as Datadog automatically declares an Incident, assigning it SEV-3, and pages the on-call engineer with a runbook link."
 
----
+## Section 5: Conclusion (30 seconds)
+"LLM Incident Commander demonstrates that with Vertex AI and Datadog, you can build AI apps that are not just powerful, but reliable, observable, and safe for enterprise production."
 
-## Part 3: Incident Management (1:30 - 2:00)
-
-**[Screen: Incident Example]**
-
-> "When monitors trigger, they don't just send alerts - they create actionable incidents in Datadog with rich context."
-
-**[Click through incident details]**
-
-> "Each incident includes the triggering metric values, direct links to APM traces showing exactly which requests were slow, relevant error logs, and most importantly - a detailed runbook telling engineers what to check and how to mitigate."
-
-**[Show incident timeline]**
-
-> "This turns monitoring into action - engineers can start investigating immediately with all the context they need."
-
----
-
-## Part 4: Dashboard & SLOs (2:00 - 2:30)
-
-**[Screen: Dashboard]**
-
-> "The dashboard provides a single pane of glass view. Real-time metrics, token usage, cost per hour, and that custom hallucination score trend."
-
-**[Scroll to SLO widgets]**
-
-> "I've defined three SLOs: 99% availability over 30 days, 95th percentile latency under 2 seconds over 7 days, and less than 1% error rate. These track error budgets so we know when we're at risk of violating our reliability targets."
-
-**[Show traffic generator results]**
-
-> "The advanced traffic generator I built can trigger each monitor on demand with different scenarios - slow queries, invalid inputs, hallucination-prone prompts - perfect for demonstrating the full observability stack."
-
----
-
-## Part 5: Innovation & Closing (2:30 - 3:00)
-
-**[Screen: Code showing custom metrics]**
-
-> "What sets this apart? First, LLM-specific telemetry - not just generic monitoring but metrics that matter for AI applications. Cost tracking, quality scoring, token usage."
-
-**[Screen: Incident with runbook]**
-
-> "Second, intelligence in the incident creation. Different severities and response types - incidents for urgent issues, cases for quality reviews."
-
-**[Screen: SLO summary]**
-
-> "And third, business alignment through SLOs. We're not just tracking metrics, we're measuring service level objectives that tie to user experience."
-
-**[Screen: Dashboard again]**
-
-> "This is production-ready observability for LLM applications. Thank you!"
-
----
-
-## Recording Tips
-
-1. **Screen Recording**: Use OBS Studio or similar
-2. **Resolution**: 1920x1080 minimum
-3. **Frame Rate**: 30 FPS
-4. **Audio**: Clear microphone, quiet environment
-
-### Timeline Checklist
-
-- [ ] 0:00-0:20: Hook + overview
-- [ ] 0:20-0:50: Problem statement + innovation
-- [ ] 0:50-1:30: Detection rules deep dive
-- [ ] 1:30-2:00: Incident management demo
-- [ ] 2:00-2:30: Dashboard + SLOs
-- [ ] 2:30-3:00: Innovation summary + close
-
-### Screens to Prepare
-
-1. Datadog Dashboard (full screen, data loaded)
-2. Monitors page showing all 4 monitors
-3. Example triggered incident with full context
-4. SLO summary page
-5. APM traces page
-6. Code snippet of hallucination detection
-7. Traffic generator running with statistics
-
-### Practice Run
-
-1. Record a practice version
-2. Check timing (must be ≤3 minutes)
-3. Verify all screens are readable
-4. Ensure audio is clear
-5. Check that innovation points are clear
-
-### Upload
-
-- Platform: YouTube (unlisted or public)
-- Title: "LLM Incident Commander - Datadog Observability Challenge"
-- Description: Include GitHub repo link
-- Add to README.md after upload
+"Thank you."

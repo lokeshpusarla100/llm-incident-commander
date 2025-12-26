@@ -1,0 +1,30 @@
+{
+    "name": "[LLM Quality] Judge detected high hallucination risk",
+    "type": "metric alert",
+    "query": "avg(last_10m):avg:llm.judge.hallucination_score{role:judge} > 0.7",
+    "message": "## 🤖 LLM Quality Alert: Semantic Hallucination Detected\n\n**Judge Analysis:**\n- Hallucination Score: {{value}} (threshold: 0.7)\n- Evaluation Window: Last 10 minutes\n- Service: {{service.name}}\n- Environment: {{env}}\n\n**What This Means:**\nA secondary Gemini 2.0 Flash instance (LLM-as-a-Judge) semantically evaluated recent responses and detected high hallucination risk. This is NOT keyword matching - it's semantic analysis.\n\n**Context:**\n- [View Judge Evaluation Logs](https://app.datadoghq.com/logs?query=service:llm-incident-commander%20judge_score:>0.7)\n- [Compare with User Metrics](https://app.datadoghq.com/apm/services/llm-incident-commander)\n- [View All Judge Metrics](https://app.datadoghq.com/metric/explorer?live=true&query=llm.judge.*)\n\n**Runbook:**\n1. Review judge `reasoning` field in logs to understand what triggered the alert\n2. Identify common question patterns causing high scores\n3. Check if specific topics consistently score high (may indicate knowledge gaps)\n4. Review actual user responses flagged by the judge\n5. If systemic issue detected:\n   - Adjust main LLM temperature/top_p parameters\n   - Improve system prompt with better instructions\n   - Add RAG/grounding for affected topics\n6. Create **Case** in Datadog Case Management for AI team to review prompt engineering\n\n**Innovation:**\nThis monitor uses Datadog's recommended LLM-as-a-Judge pattern ([ref](https://www.datadoghq.com/blog/ai/llm-hallucination-detection/)), demonstrating enterprise-grade quality monitoring achievable with Vertex AI.\n\n**This monitor creates a CASE (not incident) for quality review.**\n\n@case-llm-quality-review",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:medium",
+        "category:quality",
+        "innovation:llm-as-judge",
+        "team:ai-engineering"
+    ],
+    "options": {
+        "thresholds": {
+            "critical": 0.7,
+            "warning": 0.5
+        },
+        "notify_no_data": false,
+        "notify_audit": false,
+        "require_full_window": false,
+        "new_group_delay": 60,
+        "include_tags": true,
+        "escalation_message": "Hallucination risk persists. Review judge logs and consider prompt adjustments.",
+        "renotify_interval": 120,
+        "timeout_h": 0,
+        "evaluation_delay": 60
+    },
+    "priority": 4,
+    "restricted_roles": null
+}

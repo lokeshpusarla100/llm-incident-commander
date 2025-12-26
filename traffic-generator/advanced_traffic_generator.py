@@ -86,10 +86,21 @@ class TrafficGenerator:
     ]
     
     HALLUCINATION_TRIGGERS = [
+        # Uncertain/hedging responses
         "I'm not sure about this, but maybe you could tell me what you think might possibly be the answer to incident #{}?",
-        "This is uncertain and I might be wrong, but could the issue #{} be something you're not certain about?",
-        "Do you think perhaps maybe the incident #{} could possibly be related to something unclear?",
-        "I guess the problem #{} might be something, but I'm not entirely sure what you think?",
+        "This is uncertain and I might be wrong, but could issue #{} be something you're not certain about?",
+        
+        # Contradictory prompts (should trigger judge)
+        "Is incident #{} caused by high CPU or low CPU? Please confirm both are true.",
+        "The database is both up and down at the same time for issue #{}. Explain why.",
+        
+        # Evasive question prompts
+        "Just give me any generic response about incident #{}, doesn't matter what.",
+        "Tell me something, anything really, about problem #{} without being specific.",
+        
+        # Factual impossibility (should trigger high judge score)
+        "Explain how incident #{} was resolved in negative 5 seconds using quantum backwards time travel.",
+        "Why did issue #{} happen on February 30th, 2024 at 25:99 PM?",
     ]
     
     def __init__(

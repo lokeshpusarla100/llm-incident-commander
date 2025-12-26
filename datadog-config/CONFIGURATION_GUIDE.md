@@ -263,6 +263,37 @@ export DD_LOGS_INJECTION="true"
 
 ---
 
+### Monitor #5: LLM-as-a-Judge Monitor (NEW)
+
+**File:** `monitors/llm_judge_hallucination_monitor.json`
+
+**Purpose:** Detects semantic hallucinations using a secondary LLM evaluation.
+
+**How to Import:**
+```bash
+# Create the monitor
+curl -X POST "https://api.datadoghq.com/api/v1/monitor" \
+-H "Content-Type: application/json" \
+-H "DD-API-KEY: ${DD_API_KEY}" \
+-H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
+-d @datadog-config/monitors/llm_judge_hallucination_monitor.json
+```
+
+**Key Metrics:**
+- `llm.judge.hallucination_score`: 0.0-1.0 score from judge LLM
+- `llm.judge.cost.usd`: Cost of running evaluations
+- `llm.judge.high_risk_detected`: Alert counter
+
+**Alert Logic:**
+- Triggers when average judge score > 0.7 over 10 minutes
+- Creates **Case** (quality review) not Incident
+- Includes judge reasoning in alert context
+
+**Innovation:**
+This monitor implements Datadog's own recommended approach for LLM hallucination detection using semantic evaluation rather than keyword matching.
+
+---
+
 ## Step 3: Create Service Level Objectives (SLOs)
 
 ### SLO #1: Availability (99%)

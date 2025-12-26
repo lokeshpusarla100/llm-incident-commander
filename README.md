@@ -84,8 +84,31 @@ Observability is therefore centered on LLM behavior rather than traditional back
 
 ## ✨ Key Innovations
 
-### 1. **Hallucination Detection** 🧠
-Custom metric (0.0–1.0) detecting uncertainty phrases. Creates Cases for AI team review.
+### 1. **Semantic Hallucination Detection via LLM-as-a-Judge** 🧠 ⭐ NEW
+
+Unlike keyword-based heuristics, we implement **Datadog's recommended LLM-as-a-Judge pattern**:
+
+- **Dual-LLM Architecture**: A secondary Gemini 2.0 Flash instance semantically evaluates every response for accuracy, uncertainty, contradictions, and evasiveness
+- **Asynchronous Evaluation**: Zero user-facing latency impact - judge runs in background via `asyncio.create_task()`
+- **Structured Output**: Gemini's JSON mode (`response_mime_type: "application/json"`) ensures reliable score extraction
+- **Production-Grade Cost Tracking**: Judge tokens and costs tracked separately with dedicated metrics
+
+**Metrics Emitted:**
+- `llm.judge.hallucination_score` (0.0-1.0): Semantic accuracy score from judge LLM
+- `llm.judge.cost.usd`: Cost of running background evaluations
+- `llm.judge.tokens.total`: Token usage for judge prompts + responses
+- `llm.judge.high_risk_detected`: Counter incremented when score ≥ 0.7
+
+**How It Works:**
+1. User submits question → receives answer immediately (no wait)
+2. In parallel, judge LLM analyzes the response with structured criteria
+3. Judge emits metrics to Datadog 1-2 seconds later
+4. If score ≥ 0.7, creates a **Case** (quality issue, not incident)
+
+**Innovation:**
+This aligns with Datadog's LLM Observability product vision ([blog post](https://www.datadoghq.com/blog/ai/llm-hallucination-detection/)), proving enterprise-grade quality monitoring is achievable using Vertex AI alone. The async architecture ensures production-grade performance.
+
+**Legacy Metric:** We kept the original `llm.hallucination.score` (keyword-based) for comparison purposes.
 
 ### 2. **Cost Tracking** 💰
 Per-request cost estimation based on token usage and Gemini pricing.
@@ -193,7 +216,7 @@ _Note: Update this with your actual Datadog organization name_
 
 ### Detection Rules (Monitors)
 
-We have configured **6 monitors** to detect LLM-specific issues:
+We have configured **7 monitors** to detect LLM-specific issues:
 
 1. **High Latency Alert** (`monitors/high_latency_monitor.json`)
    - Triggers when avg latency > 2000ms for 5 minutes
@@ -219,6 +242,10 @@ We have configured **6 monitors** to detect LLM-specific issues:
 6. **Cost Spike Alert** (`monitors/cost_spike_monitor.json`) *[NEW]*
    - Triggers when cost per request > $0.01 (30x baseline)
    - Economic protection for budget overruns
+
+7. **LLM Judge Quality Alert** (`monitors/llm_judge_hallucination_monitor.json`) *[NEW] [INNOVATION]*
+   - Triggers when Judge AI detects semantic hallucination (score > 0.7)
+   - true semantic quality check using Datadog's LLM-as-a-Judge pattern
 
 ### Service Level Objectives (SLOs)
 
