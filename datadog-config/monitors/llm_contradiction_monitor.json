@@ -1,0 +1,20 @@
+{
+    "name": "[LLM Quality] Contradictions detected in responses",
+    "type": "metric alert",
+    "query": "sum(last_15m):sum:llm.judge.contradictions{*} > 5",
+    "message": "## 🔴 LLM Quality Alert: Contradictions Detected\n\n**Contradiction Analysis:**\n- Contradictions detected: {{value}} (threshold: 5 per 15 min)\n- These are HIGH-CONFIDENCE hallucinations\n\n**Runbook:**\n1. Review judge logs for contradiction details\n2. Categorize: Type A (factual) vs Type B (reasoning)\n3. Update system prompt if needed\n4. Add guardrails for confident false statements\n\n@incident-response-team",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:high",
+        "category:factuality",
+        "hallucination_type:contradiction"
+    ],
+    "options": {
+        "thresholds": {
+            "critical": 5
+        },
+        "notify_no_data": false,
+        "evaluation_delay": 60
+    },
+    "priority": 2
+}

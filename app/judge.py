@@ -1,173 +1,170 @@
 """
-LLM-as-a-Judge module for LLM Incident Commander.
-Handles async semantic evaluation of LLM responses.
+LLM-as-a-Judge for Semantic Hallucination Detection.
+Implements Datadog's rubric-based approach with contradiction vs unsupported classification.
 """
-import json
 import asyncio
-from datadog import statsd
-from ddtrace import tracer
-
+import json
 from app.config import config
 from app.logging_config import setup_logging
-from app.evaluators import categorize_question_type
+from datadog import statsd
 
 logger = setup_logging()
 
-# LLM-as-a-Judge prompt for semantic hallucination detection
-JUDGE_PROMPT = """You are an AI Quality Assurance Judge evaluating response accuracy.
+# Simplified rubric-based judge prompt (single stage for reliability)
+JUDGE_PROMPT = """You are an AI Quality Assurance Judge evaluating if a response is grounded in context.
 
-Categorize hallucinations into distinct types:
-1. **CONTRADICTION**: Response directly contradicts known facts or context
-   Example: Known fact says "System is UP" → Response claims "System is DOWN"
+CONTEXT:
+{context}
 
-2. **UNSUPPORTED**: Response makes claims with no evidence or basis
-   Example: Claiming specific numbers or dates without any source
+USER QUESTION: {question}
+AI RESPONSE: {response}
 
-3. **UNCERTAINTY**: Response uses excessive hedging indicating guessing
+Evaluate the response and classify any issues:
+1. **CONTRADICTION**: Response directly contradicts the context
+2. **UNSUPPORTED**: Response makes claims not covered by context
+3. **AGREEMENT**: Response is grounded in context
 
-USER QUESTION: "{question}"
-AI RESPONSE: "{response}"
-
-Evaluate the response and respond with ONLY this JSON structure:
+Respond with ONLY this JSON structure:
 {{
-  "hallucination_score": <float 0.0-1.0, where 1.0 is complete fabrication>,
-  "hallucination_type": "none" | "contradiction" | "unsupported" | "uncertainty",
-  "has_uncertainty_phrases": <boolean>,
-  "has_contradictions": <boolean>,
-  "is_evasive": <boolean>,
-  "reasoning": "<one sentence explanation>"
-}}
-"""
+  "hallucination_score": <0.0-1.0, where 1.0 is complete fabrication>,
+  "grounding_coverage": <0.0-1.0, percentage of claims backed by context>,
+  "hallucination_type": "none" | "contradiction" | "unsupported" | "mixed",
+  "contradictions": <count of contradictions>,
+  "unsupported_claims": <count of unsupported claims>,
+  "is_faithful": <true if hallucination_score < 0.3>,
+  "reasoning": "<one paragraph summary>"
+}}"""
 
 
-async def run_judge_evaluation(model, request_id: str, question: str, response: str):
+async def run_judge_evaluation_two_stage(
+    model,
+    request_id: str,
+    question: str,
+    answer: str,
+    context: str = ""
+):
     """
-    Runs an async evaluation using a separate LLM call.
-    Emits llm.judge.* metrics to Datadog.
-    
-    Args:
-        model: The GenerativeModel instance
-        request_id: Unique request identifier
-        question: Original user question
-        response: LLM-generated response to evaluate
+    LLM-as-a-Judge with Datadog's rubric-based approach.
+    Uses single-stage for reliability with JSON mime type enforcement.
     """
     try:
-        logger.info(f"Starting judge evaluation for request {request_id}")
+        # Use default context if empty
+        if not context or context.strip() == "":
+            context = "No specific context provided. Evaluate based on factual accuracy."
         
-        # Format and estimate tokens
-        judge_input_text = JUDGE_PROMPT.format(question=question, response=response)
-        input_tokens = config.estimate_tokens(judge_input_text)
-        
-        judge_response = await model.generate_content_async(
-            judge_input_text,
-            generation_config={"temperature": 0.0, "response_mime_type": "application/json"}
+        prompt = JUDGE_PROMPT.format(
+            context=context[:2000],
+            response=answer[:2000],
+            question=question[:500]
         )
         
-        # Parse JSON
-        try:
-            eval_data = json.loads(judge_response.text)
-            
-            # Extract metrics (enhanced with hallucination_type)
-            score = float(eval_data.get("hallucination_score", 0.0))
-            hallucination_type = eval_data.get("hallucination_type", "none")
-            has_uncertainty = eval_data.get("has_uncertainty_phrases", False)
-            has_contradictions = eval_data.get("has_contradictions", False)
-            is_evasive = eval_data.get("is_evasive", False)
-            reasoning = eval_data.get("reasoning", "No reasoning provided")
-            
-            # Calculate faithfulness score (inverse of hallucination)
-            faithfulness_score = 1.0 - score
-            
-            # Categorize question for pattern analysis
-            question_pattern = categorize_question_type(question)
-            
-            # Estimate token usage and calculate cost
-            output_tokens = config.estimate_tokens(judge_response.text)
-            total_tokens = input_tokens + output_tokens
-            judge_cost = config.calculate_cost(input_tokens, output_tokens)
-            
-            # Emit metrics to Datadog
-            statsd.gauge(
-                "llm.judge.hallucination_score", 
-                score, 
-                tags=[
-                    f"request_id:{request_id}", 
-                    f"hallucination_type:{hallucination_type}",
-                    "model:gemini-2.0-flash", 
-                    "role:judge"
-                ]
-            )
-            
-            # Faithfulness metric (positive framing)
-            statsd.gauge(
-                "llm.faithfulness_score",
-                faithfulness_score,
-                tags=[f"request_id:{request_id}", f"pattern:{question_pattern}"]
-            )
-            
-            # Pattern analysis: Track hallucinations by question type
-            statsd.increment(
-                "llm.hallucination.by_pattern",
-                tags=[
-                    f"pattern:{question_pattern}", 
-                    f"hallucination_type:{hallucination_type}",
-                    f"score_bucket:{'high' if score >= 0.7 else 'medium' if score >= 0.4 else 'low'}"
-                ]
-            )
-            
-            statsd.gauge(
-                "llm.judge.cost.usd",
-                judge_cost,
-                tags=["model:gemini-2.0-flash", "role:judge"]
-            )
-            
-            statsd.gauge(
-                "llm.judge.tokens.total",
-                total_tokens,
-                tags=["model:gemini-2.0-flash", "role:judge"]
-            )
-            
-            # Track high risk with type attribution
-            if score >= 0.7:
-                logger.warning(
-                    "High hallucination risk detected by judge",
-                    extra={
-                        "request_id": request_id,
-                        "judge_score": score,
-                        "hallucination_type": hallucination_type,
-                        "reasoning": reasoning,
-                        "user_question": question[:200],
-                        "llm_response": response[:200]
-                    }
-                )
-                statsd.increment(
-                    "llm.judge.high_risk_detected", 
-                    tags=[
-                        "model:gemini-2.0-flash", 
-                        "severity:high",
-                        f"hallucination_type:{hallucination_type}"
-                    ]
-                )
-            
-            logger.info(
-                "Judge evaluation completed", 
-                extra={
-                    "request_id": request_id,
-                    "judge_score": score,
-                    "hallucination_type": hallucination_type,
-                    "has_uncertainty": has_uncertainty,
-                    "has_contradictions": has_contradictions,
-                    "is_evasive": is_evasive,
-                    "reasoning": reasoning,
-                    "judge_cost_usd": judge_cost,
-                    "judge_tokens": total_tokens
+        input_tokens = config.estimate_tokens(prompt)
+        
+        # Use async with run_in_executor for blocking call
+        loop = asyncio.get_event_loop()
+        judge_response = await loop.run_in_executor(
+            None,
+            lambda: model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.0,
+                    "response_mime_type": "application/json",
+                    "max_output_tokens": 512
                 }
             )
-            
+        )
+        
+        # Parse JSON response
+        try:
+            eval_data = json.loads(judge_response.text)
         except json.JSONDecodeError:
-            logger.error(f"Judge returned invalid JSON for request {request_id}: {judge_response.text}")
-            statsd.increment("llm.judge.errors", tags=["error_type:json_parse", "model:gemini-2.0-flash"])
-
+            # Try to extract JSON from response
+            text = judge_response.text
+            if "{" in text and "}" in text:
+                start = text.find("{")
+                end = text.rfind("}") + 1
+                eval_data = json.loads(text[start:end])
+            else:
+                raise
+        
+        # Extract metrics
+        hallucination_score = float(eval_data.get("hallucination_score", 0.0))
+        grounding_coverage = float(eval_data.get("grounding_coverage", 1.0))
+        hallucination_type = eval_data.get("hallucination_type", "none")
+        is_faithful = eval_data.get("is_faithful", True)
+        contradictions = int(eval_data.get("contradictions", 0))
+        unsupported = int(eval_data.get("unsupported_claims", 0))
+        reasoning = eval_data.get("reasoning", "")
+        
+        # Calculate cost
+        output_tokens = config.estimate_tokens(judge_response.text)
+        total_tokens = input_tokens + output_tokens
+        judge_cost = config.calculate_cost(input_tokens, output_tokens)
+        
+        # Emit Datadog metrics
+        statsd.gauge("llm.judge.hallucination_score", hallucination_score,
+            tags=[f"request_id:{request_id}", "model:gemini-2.0-flash", "role:judge", f"is_faithful:{is_faithful}"])
+        
+        statsd.gauge("llm.judge.grounding_coverage", grounding_coverage,
+            tags=[f"request_id:{request_id}", "model:gemini-2.0-flash"])
+        
+        statsd.gauge("llm.judge.contradictions", contradictions, tags=[f"request_id:{request_id}"])
+        statsd.gauge("llm.judge.unsupported_claims", unsupported, tags=[f"request_id:{request_id}"])
+        statsd.gauge("llm.judge.cost.usd", judge_cost, tags=["model:gemini-2.0-flash", "role:judge"])
+        statsd.gauge("llm.judge.tokens.total", total_tokens, tags=["model:gemini-2.0-flash"])
+        
+        # Calculate faithfulness score (inverse)
+        faithfulness_score = 1.0 - hallucination_score
+        statsd.gauge("llm.faithfulness_score", faithfulness_score, tags=[f"request_id:{request_id}"])
+        
+        # Log results
+        logger.info("Judge evaluation completed (rubric-based)", extra={
+            "request_id": request_id,
+            "hallucination_score": hallucination_score,
+            "grounding_coverage": grounding_coverage,
+            "hallucination_type": hallucination_type,
+            "is_faithful": is_faithful,
+            "contradictions": contradictions,
+            "unsupported_claims": unsupported,
+            "judge_cost_usd": round(judge_cost, 6),
+            "reasoning": reasoning[:200]
+        })
+        
+        # High risk detection
+        if hallucination_score >= 0.7:
+            logger.warning("High hallucination risk detected", extra={
+                "request_id": request_id,
+                "hallucination_score": hallucination_score,
+                "hallucination_type": hallucination_type,
+                "reasoning": reasoning
+            })
+            statsd.increment("llm.judge.high_risk_detected", tags=["model:gemini-2.0-flash", "severity:high"])
+        
+        # Low grounding warning
+        if grounding_coverage < 0.6:
+            logger.warning("Low grounding coverage detected", extra={
+                "request_id": request_id,
+                "grounding_coverage": grounding_coverage
+            })
+            statsd.increment("llm.judge.low_grounding", tags=["model:gemini-2.0-flash"])
+        
+        return {
+            "hallucination_score": hallucination_score,
+            "grounding_coverage": grounding_coverage,
+            "hallucination_type": hallucination_type,
+            "is_faithful": is_faithful,
+            "contradictions": contradictions,
+            "unsupported_claims": unsupported,
+            "cost_usd": judge_cost,
+            "tokens": total_tokens
+        }
+    
+    except json.JSONDecodeError as e:
+        logger.error("Judge returned invalid JSON", extra={"request_id": request_id, "error": str(e)})
+        statsd.increment("llm.judge.errors", tags=["error_type:json_parse", "model:gemini-2.0-flash"])
+        return None
+    
     except Exception as e:
-        logger.error(f"Judge evaluation failed for request {request_id}: {e}")
+        logger.error("Judge evaluation failed", extra={"request_id": request_id, "error": str(e)}, exc_info=True)
         statsd.increment("llm.judge.errors", tags=["error_type:unknown", "model:gemini-2.0-flash"])
+        return None

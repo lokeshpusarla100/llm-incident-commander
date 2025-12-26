@@ -74,6 +74,33 @@ class Config:
         input_cost = (input_tokens / 1_000_000) * Config.PRICE_PER_1M_INPUT_TOKENS
         output_cost = (output_tokens / 1_000_000) * Config.PRICE_PER_1M_OUTPUT_TOKENS
         return input_cost + output_cost
+    
+    # Judge Configuration
+    JUDGE_ENABLE_TWO_STAGE: bool = True  # Use two-stage reasoning
+    JUDGE_HALLUCINATION_THRESHOLD: float = 0.7  # Score above this triggers alert
+    JUDGE_GROUNDING_THRESHOLD: float = 0.6  # Coverage below this triggers warning
+    JUDGE_CONFIDENCE_THRESHOLD: float = 0.5  # Only flag if judge is confident
+    
+    # Hallucination Sensitivity Modes
+    HALLUCINATION_SENSITIVITY = {
+        "strict": {
+            "flag_contradictions": True,
+            "flag_unsupported_claims": True,
+            "description": "Healthcare/Finance/Legal - all ungrounded claims flagged"
+        },
+        "balanced": {
+            "flag_contradictions": True,
+            "flag_unsupported_claims": True,
+            "description": "Default - balanced approach"
+        },
+        "lenient": {
+            "flag_contradictions": True,
+            "flag_unsupported_claims": False,
+            "description": "General Q&A - only direct contradictions matter"
+        }
+    }
+    
+    CURRENT_SENSITIVITY: str = "balanced"
 
 
 config = Config()

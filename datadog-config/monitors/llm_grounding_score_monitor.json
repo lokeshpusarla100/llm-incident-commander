@@ -1,0 +1,22 @@
+{
+    "name": "[LLM Quality] Grounding score below threshold",
+    "type": "metric alert",
+    "query": "avg(last_10m):avg:llm.judge.grounding_coverage{role:judge} < 0.6",
+    "message": "## 📍 LLM Quality Alert: Low Grounding Coverage\n\n**Grounding Analysis:**\n- Grounding Score: {{value}} (threshold: 0.6)\n- Evaluation Window: Last 10 minutes\n\n**What This Means:**\nLess than 60% of claims in responses are grounded in context.\n\n**Runbook:**\n1. Review judge logs for unsupported claims\n2. Check RAG module context retrieval\n3. Verify knowledge base contains relevant info\n4. Add missing documents to KB if needed\n\n@case-llm-knowledge-base",
+    "tags": [
+        "service:llm-incident-commander",
+        "severity:medium",
+        "category:quality",
+        "innovation:llm-as-judge"
+    ],
+    "options": {
+        "thresholds": {
+            "critical": 0.6,
+            "warning": 0.7
+        },
+        "notify_no_data": false,
+        "evaluation_delay": 60,
+        "include_tags": true
+    },
+    "priority": 3
+}

@@ -24,11 +24,9 @@ from app.evaluators import (
 )
 from app.experiments import get_experiment_variant, EXPERIMENT_VARIANTS
 from app.rag import retrieve_context
-from app.judge import run_judge_evaluation
+from app.judge import run_judge_evaluation_two_stage
 
 logger = setup_logging()
-
-# Create router
 router = APIRouter()
 
 
@@ -76,7 +74,7 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
         
         logger.info("LLM request received", extra={"request_id": request_id, "question_length": len(req.question)})
         
-        # Pre-processing
+        # Pre-processing: Security scan
         injection_scan = scan_for_prompt_injection(req.question)
         statsd.gauge("llm.security.injection_risk", injection_scan["injection_risk_score"], tags=[f"request_id:{request_id}"])
         
@@ -84,7 +82,10 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
             logger.warning("Potential prompt injection detected", extra={"request_id": request_id, **injection_scan})
             statsd.increment("llm.security.injection_detected")
         
+        # Experiment variant
         variant = get_experiment_variant(request_id)
+        
+        # RAG: Retrieve context from knowledge base
         context = retrieve_context(req.question)
         
         # LLM Generation
@@ -94,6 +95,7 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
             span.set_tag("llm.provider", "google")
             span.set_tag("llm.request_id", request_id)
             span.set_tag("experiment.variant", variant)
+            span.set_tag("rag.context_length", len(context))
             
             input_tokens = config.estimate_tokens(req.question)
             
@@ -109,13 +111,13 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
             except ResourceExhausted as e:
                 _handle_error(span, request_id, start_time, "quota_exceeded", 429, "Vertex AI quota exceeded", e)
             except DeadlineExceeded as e:
-                _handle_error(span, request_id, start_time, "timeout", 504, f"Request exceeded {config.LLM_TIMEOUT_SECONDS}s timeout", e)
+                _handle_error(span, request_id, start_time, "timeout", 504, f"Request timeout", e)
             except GoogleAPICallError as e:
-                _handle_error(span, request_id, start_time, "api_error", 500, "Failed to communicate with Vertex AI", e)
+                _handle_error(span, request_id, start_time, "api_error", 500, "Vertex AI API error", e)
             except Exception as e:
-                _handle_error(span, request_id, start_time, "unexpected", 500, "An unexpected error occurred", e)
+                _handle_error(span, request_id, start_time, "unexpected", 500, "Unexpected error", e)
         
-        # Post-processing
+        # Post-processing metrics
         latency_ms = int((time.time() - start_time) * 1000)
         output_tokens = config.estimate_tokens(answer)
         total_tokens = input_tokens + output_tokens
@@ -130,12 +132,13 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
         statsd.gauge("llm.cost.usd", cost_usd)
         statsd.gauge("llm.hallucination.score", hallucination_score)
         
-        # Evaluations
+        # Security: PII scan
         pii_scan = scan_for_pii_leakage(answer)
         if pii_scan["has_pii"]:
             logger.warning("PII detected", extra={"request_id": request_id, **pii_scan})
             statsd.increment("llm.security.pii_leaked")
         
+        # Evaluations
         quality_eval = evaluate_incident_response_quality(req.question, answer)
         grounding = calculate_grounding_score(answer, context)
         question_pattern = categorize_question_type(req.question)
@@ -156,8 +159,23 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
             logger.warning("High hallucination score", extra={"request_id": request_id, "score": hallucination_score})
             statsd.increment("llm.hallucination.high_score")
         
-        # Fire and forget: Judge evaluation
-        asyncio.create_task(run_judge_evaluation(model, request_id, req.question, answer))
+        # Fire and forget: Two-stage judge evaluation with context
+        async def evaluate_with_judge():
+            judge_result = await run_judge_evaluation_two_stage(
+                model=model,
+                request_id=request_id,
+                question=req.question,
+                answer=answer,
+                context=context  # Pass actual context from RAG
+            )
+            if judge_result and judge_result.get("hallucinations"):
+                logger.info("Judge found hallucinations", extra={
+                    "request_id": request_id,
+                    "hallucination_count": len(judge_result["hallucinations"]),
+                    "hallucinations": judge_result["hallucinations"][:3]
+                })
+        
+        asyncio.create_task(evaluate_with_judge())
         
         return AskResponse(
             request_id=request_id,
