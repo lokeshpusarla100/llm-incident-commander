@@ -1,15 +1,16 @@
 {
+    "_note": "OPTIONAL CONTEXT ENRICHMENT: This template provides structured fields for Datadog monitors to include when creating incidents. The monitor (in Datadog) creates incidents, not the application. This template is NOT a required runtime artifact.",
     "id": "llm_hallucination_template",
     "type": "incident_template",
     "name": "LLM Hallucination Detected",
-    "description": "High hallucination score from judge evaluation",
+    "description": "Context template for hallucination incidents created by Datadog monitors",
     "severity": "SEV-3",
     "status": "open",
     "fields": {
         "hallucination_score": {
             "type": "number",
             "required": true,
-            "description": "Hallucination score 0.0-1.0"
+            "description": "Hallucination score 0.0-1.0 (from authoritative Judge LLM)"
         },
         "hallucination_type": {
             "type": "enum",

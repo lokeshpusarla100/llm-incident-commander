@@ -23,7 +23,7 @@
                 "type": "timeseries",
                 "requests": [
                     {
-                        "q": "sum:llm.cost.usd{service:llm-incident-commander}.as_rate()",
+                        "q": "sum:llm.cost.usd{service:llm-incident-commander}.as_rate() + sum:llm.judge.cost.usd{service:llm-incident-commander}.as_rate()",
                         "display_type": "line",
                         "style": {
                             "palette": "cool",
@@ -96,7 +96,7 @@
                 "type": "query_value",
                 "requests": [
                     {
-                        "q": "avg(last_5m):avg:llm.hallucination.score{service:llm-incident-commander}",
+                        "q": "avg(last_5m):avg:llm.judge.hallucination_score{service:llm-incident-commander}",
                         "aggregator": "avg",
                         "conditional_formats": [
                             {

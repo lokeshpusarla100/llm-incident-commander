@@ -1,5 +1,5 @@
 {
-    "_note": "Datadog Incident Management configuration for LLM Incident Commander",
+    "_note": "Datadog Incident Management configuration for LLM Incident Commander. INCIDENTS ARE CREATED BY DATADOG MONITORS, NOT BY THE APPLICATION. This file documents how Datadog monitors are configured to create incidents.",
     "incident_settings": {
         "service": "llm-incident-commander",
         "auto_resolve": false,

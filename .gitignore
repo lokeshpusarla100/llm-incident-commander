@@ -81,3 +81,16 @@ ddtrace-run.log
 tmp/
 temp/
 *.tmp
+
+# Local reference files (not for git)
+app/animation.html
+#app/index.html
+
+# Internal documentation (not for submission)
+HACKATHON.md
+VIDEO_SCRIPT.md
+FINAL_VERIFICATION.md
+INCIDENT_WALKTHROUGH.md
+screenshots/README.md
+screenshots/SCREENSHOTS.md
+datadog-config/MANIFEST.md

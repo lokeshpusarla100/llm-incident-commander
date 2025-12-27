@@ -148,14 +148,16 @@ export DD_LOGS_INJECTION="true"
 
 ---
 
-### Monitor #3: Hallucination Score Alert
+### Monitor #3: Hallucination Score Alert (Judge-Based)
 
-**Purpose:** Detect when LLM responses show signs of uncertainty or hallucination.
+**Purpose:** Detect when LLM responses show signs of hallucination using authoritative LLM-as-a-Judge evaluation.
+
+> **NOTE:** This monitor uses the **authoritative** `llm.judge.hallucination_score` metric from the Judge LLM, not heuristic string matching.
 
 **Configuration:**
 1. Navigate to **Monitors** → **New Monitor** → **Metric**
 2. **Define the metric:**
-   - Metric: `llm.hallucination.score`
+   - Metric: `llm.judge.hallucination_score`
    - Aggregation: `avg`
    - Time window: `10 minutes`
 3. **Set alert conditions:**
@@ -174,9 +176,9 @@ export DD_LOGS_INJECTION="true"
    - Service: {{service.name}}
    
    **What This Means:**
-   The LLM responses contain phrases indicating uncertainty such as:
-   - "I think", "maybe", "might be wrong"
-   - "not sure", "possibly", "could be"
+   The Judge LLM semantically evaluated responses and detected:
+   - **Contradictions**: Response directly contradicts the context
+   - **Unsupported claims**: Response makes claims not backed by context
    
    This may indicate:
    - Model degradation
@@ -205,7 +207,9 @@ export DD_LOGS_INJECTION="true"
 5. **Tags:** `service:llm-incident-commander`, `severity:medium`, `category:quality`
 6. **Save**
 
-**JSON Export:** See `monitors/hallucination_score_monitor.json`
+**JSON Export:** See `monitors/llm_judge_hallucination_monitor.json`
+
+> **REMOVED:** The legacy `hallucination_score_monitor.json` using heuristic string matching has been removed. Only authoritative judge-based metrics are used.
 
 ---
 
@@ -419,12 +423,13 @@ This monitor implements Datadog's own recommended approach for LLM hallucination
     - `llm.tokens.total`
   - Visualization: Stacked area
   
-- **Widget 6:** Estimated Cost per Hour
-  - Metric: `sum:llm.cost.usd{*}.rollup(sum, 3600)`
+- **Widget 6:** Actual Cost per Hour (Main + Judge)
+  - Metric: `sum:llm.cost.usd{*}.rollup(sum, 3600) + sum:llm.judge.cost.usd{*}.rollup(sum, 3600)`
   - Visualization: Query Value with threshold
+  - Note: Includes both main LLM and Judge evaluation costs
   
-- **Widget 7:** Hallucination Score Trend
-  - Metric: `avg:llm.hallucination.score{*}`
+- **Widget 7:** Hallucination Score Trend (Authoritative)
+  - Metric: `avg:llm.judge.hallucination_score{*}`
   - Visualization: Timeseries with threshold line at 0.7
 
 #### Row 3: Performance Metrics

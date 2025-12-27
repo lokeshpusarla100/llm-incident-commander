@@ -1,5 +1,5 @@
 {
-    "_note": "Incident templates for LLM Incident Commander - provides actionable context",
+    "_note": "OPTIONAL CONTEXT ENRICHMENT: These templates provide structured fields and runbook information that Datadog monitors can include when they create incidents. INCIDENTS ARE CREATED BY DATADOG MONITORS, NOT BY THE APPLICATION. These templates are NOT required runtime artifacts.",
     "templates": [
         {
             "id": "llm_latency_degradation",

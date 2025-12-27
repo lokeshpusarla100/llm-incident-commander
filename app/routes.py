@@ -178,15 +178,18 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
         hallucination_score = calculate_hallucination_score(answer)
         
         # Emit metrics
-        statsd.increment("llm.requests.total", tags=["status:success", "model:gemini-2.0-flash"])
-        statsd.histogram("llm.latency.ms", latency_ms, tags=["model:gemini-2.0-flash"])
+        latency_bucket = "under_2s" if latency_ms < 2000 else "over_2s"
+        statsd.increment("llm.requests.total", tags=["status:success", "model:gemini-2.0-flash", f"latency_bucket:{latency_bucket}"])
+        statsd.histogram("llm.latency.ms", latency_ms, tags=["model:gemini-2.0-flash", f"latency_bucket:{latency_bucket}"])
         statsd.gauge("llm.tokens.input", input_tokens, tags=["model:gemini-2.0-flash"])
         statsd.gauge("llm.tokens.output", output_tokens, tags=["model:gemini-2.0-flash"])
         statsd.gauge("llm.tokens.total", total_tokens, tags=["model:gemini-2.0-flash"])
         statsd.gauge("llm.cost.usd", cost_usd, tags=["model:gemini-2.0-flash", "currency:usd"])
         statsd.gauge("llm.cost.per_token", cost_usd / max(1, total_tokens), tags=["model:gemini-2.0-flash"])
         
-        statsd.gauge("llm.hallucination.score", hallucination_score)
+        # NOTE: NOT emitting llm.hallucination.score to Datadog - it's a heuristic (string matching)
+        # not authoritative LLM telemetry. The authoritative score comes from the Judge LLM
+        # via llm.judge.hallucination_score metric. Fail-closed: no heuristic metrics.
         
         # Security: PII scan
         pii_scan = scan_for_pii_leakage(answer)
@@ -220,8 +223,9 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
         })
         
         if hallucination_score >= config.HALLUCINATION_THRESHOLD:
-            logger.warning("High hallucination score", extra={"request_id": request_id, "score": hallucination_score})
-            statsd.increment("llm.hallucination.high_score")
+            # Log for internal visibility only - do NOT emit heuristic metrics to Datadog
+            logger.warning("High hallucination score (heuristic)", extra={"request_id": request_id, "score": hallucination_score})
+            # NOTE: Not incrementing llm.hallucination.high_score - heuristic, not authoritative
         
         # ✅ REAL-TIME JUDGE & PREVENTION SYSTEM
         # For 'hallucination' test mode, we run synchronously to demonstrate PREVENTION.
@@ -290,6 +294,9 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
 def _handle_error(span, request_id: str, start_time: float, error_type: str, status_code: int, message: str, exception: Exception):
     """Handle LLM errors with consistent logging and metrics."""
     latency_ms = int((time.time() - start_time) * 1000)
+    latency_bucket = "under_2s" if latency_ms < 2000 else "over_2s"
+    # ✅ ERROR-RATE SLO: Count errors as requests for correct SLO math
+    statsd.increment("llm.requests.total", tags=["status:error", f"error_type:{error_type}", "model:gemini-2.0-flash", f"latency_bucket:{latency_bucket}"])
     statsd.increment("llm.errors.total", tags=[f"error_type:{error_type}", "model:gemini-2.0-flash"])
     span.set_tag("error", True)
     span.set_tag("error.type", error_type)

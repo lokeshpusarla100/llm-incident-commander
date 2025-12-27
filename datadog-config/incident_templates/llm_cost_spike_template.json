@@ -1,8 +1,9 @@
 {
+    "_note": "OPTIONAL CONTEXT ENRICHMENT: This template provides structured fields for Datadog monitors to include when creating incidents. The monitor (in Datadog) creates incidents, not the application. This template is NOT a required runtime artifact.",
     "id": "llm_cost_spike_template",
     "type": "incident_template",
     "name": "LLM Cost Spike Incident",
-    "description": "Auto-created incident for cost spike detection",
+    "description": "Context template for cost spike incidents created by Datadog monitors",
     "severity": "SEV-2",
     "status": "open",
     "notification_handles": [

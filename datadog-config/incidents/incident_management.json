@@ -1,4 +1,5 @@
 {
+    "_note": "OPTIONAL CONTEXT ENRICHMENT: These templates provide structured context for incidents CREATED BY DATADOG MONITORS. The 'created_by_monitor' field specifies WHICH Datadog monitor creates the incident, not app-side creation.",
     "incident_templates": [
         {
             "id": "llm-hallucination-high-risk",

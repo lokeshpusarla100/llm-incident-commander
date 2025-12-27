@@ -21,7 +21,7 @@ The system demonstrates enterprise-grade LLM monitoring:
 - **📊 4 Detection Rules**: Monitors for latency, errors, hallucination, and quota
 - **🎯 3 SLOs**: Availability (99%), Latency P95 (<2s), Error Rate (<1%)
 - **⚡ Incident Management**: Auto-create incidents/cases with rich context
-- **💰 Cost Tracking**: Real-time token and cost estimation
+- **💰 Cost Tracking**: Authoritative token and cost tracking from LLM usage_metadata
 
 ---
 
@@ -110,10 +110,12 @@ Unlike keyword-based heuristics, we implement **Datadog's recommended LLM-as-a-J
 **Innovation:**
 This aligns with Datadog's LLM Observability product vision ([blog post](https://www.datadoghq.com/blog/ai/llm-hallucination-detection/)), proving enterprise-grade quality monitoring is achievable using Vertex AI alone. The async architecture ensures production-grade performance.
 
-**Legacy Metric:** We kept the original `llm.hallucination.score` (keyword-based) for comparison purposes.
+> **Authoritative Metrics Only**: We only emit the Judge-based `llm.judge.hallucination_score` to Datadog. No heuristic or estimated metrics are emitted—fail-closed design ensures telemetry integrity.
 
 ### 2. **Cost Tracking** 💰
-Per-request actual cost calculation based on official Gemini pricing.
+Per-request actual cost calculation based on official Gemini pricing. Pricing configuration includes `verified_date` and hash for drift detection.
+
+> **Future Enhancement**: A CI job could validate pricing hash against official Gemini pricing API to detect cost model drift automatically.
 
 ### 3. **Context-Rich Incidents** 📝
 Auto-created incidents include APM traces, error logs, and runbooks.
@@ -253,6 +255,8 @@ We have configured **8 monitors** to detect LLM-specific issues:
    - Triggers when 3+ injection attempts detected in 5 minutes
    - Priority 1 (highest) - creates immediate security incident
 
+> **Security Note**: Prompt-injection detection uses regex heuristics (v1). In production, this would be replaced with a lightweight LLM-based intent classifier (e.g., Prompt Shield or similar).
+
 ### Service Level Objectives (SLOs)
 
 1. **Availability SLO** - 99% over 30 days
@@ -328,10 +332,10 @@ Our observability strategy focuses on metrics that matter for LLM applications:
 - `llm.tokens.total` - Total tokens per request
 - `llm.cost.usd` - Actual cost based on Gemini pricing
 
-#### **Quality Metrics**
-- `llm.hallucination.score` - Custom metric (0.0-1.0) detecting uncertainty
-- `llm.hallucination.high_score` - Counter for responses exceeding threshold
-- `llm.judge.hallucination_score` - Semantic score from Judge LLM
+#### **Quality Metrics** (Authoritative Only)
+- `llm.judge.hallucination_score` - Semantic score from Judge LLM (0.0-1.0)
+- `llm.judge.grounding_coverage` - Percentage of claims backed by context
+- `llm.judge.high_risk_detected` - Counter for high-risk hallucination events
 
 #### **Error Metrics**
 - `llm.errors.total{error_type}` - Errors by type (quota, timeout, api_error)
