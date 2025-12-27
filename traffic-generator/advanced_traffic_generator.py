@@ -24,6 +24,7 @@ class ScenarioType(Enum):
     SLOW_QUERY = "slow_query"
     INVALID_INPUT = "invalid_input"
     HALLUCINATION_TRIGGER = "hallucination_trigger"
+    COST_SPIKE = "cost_spike"
     BURST = "burst"
 
 
@@ -183,9 +184,16 @@ class TrafficGenerator:
         start = time.time()
         
         try:
+            # Build payload with test_mode for specific scenarios
+            payload = {"question": question}
+            if scenario == ScenarioType.HALLUCINATION_TRIGGER:
+                payload["test_mode"] = "hallucination"
+            elif scenario == ScenarioType.COST_SPIKE:
+                payload["test_mode"] = "cost"
+            
             response = await client.post(
                 f"{self.base_url}/ask",
-                json={"question": question},
+                json=payload,
                 timeout=60.0
             )
             
@@ -352,7 +360,7 @@ def main():
     )
     parser.add_argument(
         "--scenario",
-        choices=["normal", "slow_query", "invalid_input", "hallucination_trigger", "burst"],
+        choices=["normal", "slow_query", "invalid_input", "hallucination_trigger", "cost_spike", "burst"],
         help="Specific scenario to run (default: mixed)"
     )
     parser.add_argument(

@@ -13,6 +13,8 @@ LLM Incident Commander is a minimal LLM-powered assistant designed to demonstrat
 
 > **The application is intentionally simple (a chatbot/assistant); the innovation lies in how Datadog observes, detects, and responds to LLM failures, not in UI complexity.**
 
+> **Control-Plane Architecture**: The application emits LLM telemetry (tokens, costs, hallucination scores). Datadog evaluates system-level behavior using monitors and automatically creates incidents when thresholds are breached. The application enforces per-request safety policy (e.g., blocking hallucinated responses) based on real-time analysis—this is **per-request enforcement**, not Datadog blocking. Datadog provides **system-level governance** through detection rules and incident management.
+
 The system demonstrates enterprise-grade LLM monitoring:
 
 - **🔍 Full-Stack Observability**: APM traces, structured logs, custom metrics

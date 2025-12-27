@@ -25,6 +25,17 @@
         "timeout_h": 0,
         "evaluation_delay": 60
     },
+    "notify_by": [
+        "incident"
+    ],
+    "incident": {
+        "severity": "SEV-3",
+        "fields": {
+            "hallucination_score": "{{value}}",
+            "detection_method": "llm_as_judge_semantic",
+            "monitor_name": "llm_judge_hallucination_monitor"
+        }
+    },
     "priority": 4,
     "restricted_roles": null
 }
