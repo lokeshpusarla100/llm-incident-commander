@@ -120,8 +120,8 @@ Per-request actual cost calculation based on official Gemini pricing. Pricing co
 ### 3. **Context-Rich Incidents** 📝
 Auto-created incidents include APM traces, error logs, and runbooks.
 
-### 4. **Traffic Generator** 🎭
-Test scenarios for latency, errors, and quality degradation.
+### 4. **Traffic Generation** 🎭
+> **Note**: Incident-triggering traffic was generated externally using a custom script during testing to validate monitors and SLOs. The generator script is excluded from the repository to keep the submission minimal.
 
 ### 5. **SLOs with Error Budgets** 🎯
 Availability, latency, and error rate SLOs with burn rate tracking.
