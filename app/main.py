@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel
@@ -44,6 +45,15 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(title=config.APP_NAME, version=config.DD_VERSION, lifespan=lifespan)
+
+# CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins, crucial for local index.html
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Static files & templates
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")

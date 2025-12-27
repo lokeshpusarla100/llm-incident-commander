@@ -69,19 +69,27 @@ def get_vector_store():
     
     return _vector_store
 
-def retrieve_context(question: str, k: int = 3) -> str:
+def retrieve_context(question: str, k: int = 3, test_mode: str = None) -> str:
     """
     Retrieve relevant context from Vector Search using semantic similarity.
     
     Args:
         question: User question
         k: Number of documents to retrieve
+        test_mode: "hallucination" triggers RAG poisoning
         
     Returns:
         Combined context from top-k similar documents
     """
     start_time = time.time()
     
+    # 🧪 RAG POISONING (Failure Injection)
+    # If in hallucination test mode, we intentionally return irrelevant context.
+    # This simulates a retrieval failure or "poisoned" knowledge base.
+    if test_mode == "hallucination":
+        logger.info(f"🧪 [TEST MODE] Injecting RAG Poison for question: {question[:50]}...")
+        return "Context: This document describes how to bake a chocolate cake. 1. Mix flour and sugar. 2. Add eggs. 3. Bake at 350F. (Irrelevant context injected for testing)"
+
     try:
         vector_store = get_vector_store()
         
