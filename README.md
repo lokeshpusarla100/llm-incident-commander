@@ -253,8 +253,7 @@ python3 traffic-generator/advanced_traffic_generator.py --scenario hallucination
 
 ### Datadog Organization
 
-**Organization Name**: `TODO: Add your Datadog org name`  
-_Note: Update this with your actual Datadog organization name_
+**Organization Name**: `Lokesh_pusarla`
 
 ### Detection Rules (Monitors)
 
@@ -422,7 +421,7 @@ Wait 5-10 minutes after each test for monitors to evaluate and check:
 
 ## 📹 Demo Video
 
-**Video URL**: `TODO: Add your 3-minute YouTube video URL`  
+**Video URL**: [https://youtu.be/cjZvFY6__qw](https://youtu.be/cjZvFY6__qw?si=RvtE-8uN93KhF8Gi)  
 _3-minute walkthrough covering:_
 1. Observability strategy overview
 2. Detection rules and rationale
@@ -576,7 +575,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 For the AI Accelerate: Google Cloud Partnerships Hackathon  
 Datadog Challenge
 
-**Datadog Organization**: `TODO: Add your Datadog org name`
+**Datadog Organization**: `Lokesh_pusarla`
 
 ---
 

@@ -158,10 +158,6 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
                 _handle_error(span, request_id, start_time, "api_error", 500, "Vertex AI API error", e)
             except Exception as e:
                 _handle_error(span, request_id, start_time, "unexpected", 500, "Unexpected error", e)
-            except GoogleAPICallError as e:
-                _handle_error(span, request_id, start_time, "api_error", 500, "Vertex AI API error", e)
-            except Exception as e:
-                _handle_error(span, request_id, start_time, "unexpected", 500, "Unexpected error", e)
         
         # Post-processing metrics
         latency_ms = int((time.time() - start_time) * 1000)
