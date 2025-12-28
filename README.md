@@ -13,14 +13,14 @@ LLM Incident Commander is a minimal LLM-powered assistant designed to demonstrat
 
 > **The application is intentionally simple (a chatbot/assistant); the innovation lies in how Datadog observes, detects, and responds to LLM failures, not in UI complexity.**
 
-> **Control-Plane Architecture**: The application emits LLM telemetry (tokens, costs, hallucination scores). Datadog evaluates system-level behavior using monitors and automatically creates incidents when thresholds are breached. The application enforces per-request safety policy (e.g., blocking hallucinated responses) based on real-time analysis—this is **per-request enforcement**, not Datadog blocking. Datadog provides **system-level governance** through detection rules and incident management.
+> **Control-Plane Architecture**: The application emits LLM telemetry (tokens, costs, hallucination scores). Datadog evaluates system-level behavior using monitors and surfaces actionable records (alerts, incidents, cases) when thresholds are breached. The application enforces per-request safety policy (e.g., blocking hallucinated responses) based on real-time analysis—Datadog is **not in the request execution path**. Datadog provides **system-level governance** through detection rules and incident management.
 
 The system demonstrates enterprise-grade LLM monitoring:
 
 - **🔍 Full-Stack Observability**: APM traces, structured logs, custom metrics
 - **📊 8 Detection Rules**: Monitors for latency, errors, hallucination, quota, cost, abuse, and security
 - **🎯 3 SLOs**: Availability (99%), Latency P95 (<2s), Error Rate (<1%)
-- **⚡ Incident Management**: Auto-create incidents/cases with rich context
+- **⚡ Incident Management**: Surfaces actionable records (alerts/incidents/cases)
 - **💰 Cost Tracking**: Authoritative token and cost tracking from LLM usage_metadata
 
 ---
@@ -32,7 +32,7 @@ The system demonstrates enterprise-grade LLM monitoring:
 3. Datadog traces the full request lifecycle
 4. If latency, errors, cost, or quality degrade:
    - A monitor triggers
-   - An incident or case is created in Datadog with trace context
+   - Datadog surfaces actionable records; engineers can pivot to related traces and logs via APM correlation
 
 ---
 
@@ -72,7 +72,7 @@ Observability is therefore centered on LLM behavior rather than traditional back
                     ┌─────────────────────┐
                     │  Datadog Platform   │
                     ├─────────────────────┤
-                    │ • Monitors (4)      │
+                    │ • Monitors (8)      │
                     │ • SLOs (3)          │
                     │ • Dashboard         │
                     │ • Incident Mgmt     │
@@ -132,7 +132,7 @@ Per-request actual cost calculation based on official Gemini pricing. Pricing co
 > **Future Enhancement**: A CI job could validate pricing hash against official Gemini pricing API to detect cost model drift automatically.
 
 ### 3. **Context-Rich Incidents** 📝
-Auto-created incidents include APM traces, error logs, and runbooks.
+Datadog surfaces actionable records that allow engineers to pivot to related APM traces, error logs, and runbooks.
 
 ### 4. **Traffic Generation** 🎭
 > **For Judges**: A complete traffic generator is included in `traffic-generator/` to help you verify the monitors and dashboards. It creates realistic load, errors, and hallucination scenarios to trigger the Datadog alerts.
@@ -375,7 +375,7 @@ _3-minute walkthrough covering:_
 - [x] **LLM Application** powered by Vertex AI (Gemini 2.0 Flash)
 - [x] **3+ Detection Rules** (4 monitors configured)
 - [x] **3+ SLOs** with error budgets
-- [x] **Incident Management** - Auto-create incidents with context
+- [x] **Incident Management** - Surfaces actionable records via monitors
 - [x] **Case Management** - Quality issues create cases
 - [x] **Dashboard** - Comprehensive observability view
 - [x] **JSON Exports** - All Datadog configs in `/datadog-config`

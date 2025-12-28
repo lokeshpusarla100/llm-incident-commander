@@ -82,16 +82,9 @@ tmp/
 temp/
 *.tmp
 # traffic-generator/ (REQUIRED for demo - do not ignore)
-app/animation.html
-
 
 # Internal documentation (not for submission)
-HACKATHON.md
-VIDEO_SCRIPT.md
-FINAL_VERIFICATION.md
-INCIDENT_WALKTHROUGH.md
-QUICKSTART.md
+docs/
 screenshots/README.md
 screenshots/SCREENSHOTS.md
 datadog-config/MANIFEST.md
-PRE_DEPLOYMENT_TODO.md

@@ -20,12 +20,7 @@ ddtrace-debug.log
 LICENSE
 deploy_vector_search.sh
 setup_vector_search.py
-VIDEO_SCRIPT.md
-HACKATHON.md
-QUICKSTART.md
-DEPLOYMENT.md
-FINAL_VERIFICATION.md
-INCIDENT_WALKTHROUGH.md
+docs/
 
 # Application specific
 datadog-config/
