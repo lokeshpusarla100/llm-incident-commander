@@ -18,7 +18,7 @@ LLM Incident Commander is a minimal LLM-powered assistant designed to demonstrat
 The system demonstrates enterprise-grade LLM monitoring:
 
 - **🔍 Full-Stack Observability**: APM traces, structured logs, custom metrics
-- **📊 4 Detection Rules**: Monitors for latency, errors, hallucination, and quota
+- **📊 8 Detection Rules**: Monitors for latency, errors, hallucination, quota, cost, abuse, and security
 - **🎯 3 SLOs**: Availability (99%), Latency P95 (<2s), Error Rate (<1%)
 - **⚡ Incident Management**: Auto-create incidents/cases with rich context
 - **💰 Cost Tracking**: Authoritative token and cost tracking from LLM usage_metadata
@@ -144,107 +144,46 @@ Availability, latency, and error rate SLOs with burn rate tracking.
 
 ## 🚀 Quick Start
 
-You can run the application using **Docker (Recommended)** or **Local Python**.
-
-### Option A: Run with Docker 🐳
-
-The easiest way to run the judge-safe environment.
+> Docker is the recommended path for evaluation. This container is Cloud Run compatible.
 
 ```bash
-# 1. Build the image
-docker build -t llm-incident-commander .
-
-# 2. Run with environment variables
-# Note: You must provide your own credentials.
-docker run -p 8080:8080 \
-  -e GCP_PROJECT_ID="your-project-id" \
-  -e DD_API_KEY="your-datadog-key" \
-  -e VERTEX_AI_MODEL="gemini-2.0-flash" \
-  -v $HOME/.config/gcloud:/root/.config/gcloud \
-  llm-incident-commander
-```
-
-> **Note on GCP Auth**: The `-v` flag above mounts your local gcloud credentials into the container. Alternatively, use `GOOGLE_APPLICATION_CREDENTIALS`.
-
-### Option B: Local Python Setup
-
-### Prerequisites
-
-- Python 3.12+
-- Google Cloud account with Vertex AI API enabled
-- Datadog account (free trial: https://www.datadoghq.com/free-trial/)
-
-### 1. Clone & Setup
-
-```bash
+# 1. Clone the repository
 git clone <your-repo-url>
 cd llm-incident-commander
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# 2. Create .env from template
+cp .env.example .env
+# Edit .env: set GCP_PROJECT_ID and DD_API_KEY
 
-# Install dependencies
+# 3. Place your GCP service account key
+mkdir -p ~/secrets
+cp /path/to/your-service-account.json ~/secrets/llm-incident-commander.json
+
+# 4. Run with docker-compose (includes Datadog Agent)
+docker-compose up --build
+```
+
+App: `http://localhost:8080` • Generate traffic with `traffic-generator/` (see below)
+
+<details>
+<summary>Local Development (without Docker)</summary>
+
+```bash
+python3 traffic-generator/advanced_traffic_generator.py --rps 2 --duration 300
+```
+
+---
+
+### Local Development (Optional)
+
+For reviewers who prefer running without Docker:
+
+```bash
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-```
-
-### 2. Configure Google Cloud
-
-```bash
-# Authenticate with Google Cloud
 gcloud auth application-default login
-
-# Set project ID
-export GCP_PROJECT_ID="project_id"
-```
-
-### 3. Configure Datadog
-
-```bash
-# Set Datadog credentials
-export DD_API_KEY="your-datadog-api-key"
-export DD_SITE="datadoghq.com"  # or datadoghq.eu for EU
-export DD_SERVICE="llm-incident-commander"
-export DD_ENV="production"
-export DD_VERSION="1.0.0"
-export DD_LOGS_INJECTION="true"
-```
-
-### 4. Run the Application
-
-```bash
-# Start with Datadog tracing
-ddtrace-run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-The application will be available at: `http://localhost:8000`
-
-API documentation: `http://localhost:8000/docs`
-
-### 5. Generate Traffic
-
-In a new terminal:
-
-```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Test connection
-python3 traffic-generator/advanced_traffic_generator.py --test-connection
-
-# Generate mixed traffic (normal + scenarios to trigger monitors)
-python3 traffic-generator/advanced_traffic_generator.py --rps 5 --duration 600
-
-# Or trigger specific scenarios:
-
-# Trigger latency alert
-python3 traffic-generator/advanced_traffic_generator.py --scenario slow_query --rps 3 --duration 400
-
-# Trigger error rate alert
-python3 traffic-generator/advanced_traffic_generator.py --scenario invalid_input --rps 2 --duration 300
-
-# Trigger hallucination alert
-python3 traffic-generator/advanced_traffic_generator.py --scenario hallucination_trigger --rps 2 --duration 600
+export GCP_PROJECT_ID="your-project-id" DD_API_KEY="your-datadog-key"
+ddtrace-run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ---
