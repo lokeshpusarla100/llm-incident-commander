@@ -14,13 +14,17 @@ from datadog import statsd
 logger = setup_logging()
 
 # Initialize Vertex AI
-PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
-REGION = os.environ.get("GCP_REGION", "us-central1")
+# Authorization
+from app.config import config
 
-# Vector Search configuration (from setup)
-VS_INDEX_ID = os.environ.get("VS_INDEX_ID")
-VS_ENDPOINT_ID = os.environ.get("VS_ENDPOINT_ID")
-VS_BUCKET_NAME = os.environ.get("VS_BUCKET_NAME")
+# Initialize Vertex AI
+PROJECT_ID = config.GCP_PROJECT_ID
+REGION = config.GCP_LOCATION
+
+# Vector Search configuration
+VS_INDEX_ID = config.VS_INDEX_ID
+VS_ENDPOINT_ID = config.VS_ENDPOINT_ID
+VS_BUCKET_NAME = config.VS_BUCKET_NAME
 
 # Global vector store (lazy loaded)
 _vector_store = None

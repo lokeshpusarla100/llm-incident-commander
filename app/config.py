@@ -123,6 +123,11 @@ class Config:
     VECTOR_SEARCH_ENABLED: bool = True
     VECTOR_SEARCH_K: int = 3  # Number of documents to retrieve
     VECTOR_SEARCH_EMBEDDING_MODEL: str = "text-embedding-004"
+    
+    # RAG Infrastructure Defaults (Auto-filled)
+    VS_INDEX_ID: str = os.getenv("VS_INDEX_ID", "1368014566302154752")
+    VS_ENDPOINT_ID: str = os.getenv("VS_ENDPOINT_ID", "5019246391541628928")
+    VS_BUCKET_NAME: str = os.getenv("VS_BUCKET_NAME", "forms-e5771-llm-incident-vector-search")
 
 
 config = Config()
