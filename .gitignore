@@ -81,8 +81,7 @@ ddtrace-run.log
 tmp/
 temp/
 *.tmp
-traffic-generator/
-# Local reference files (not for git)
+# traffic-generator/ (REQUIRED for demo - do not ignore)
 app/animation.html
 
 

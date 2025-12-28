@@ -138,7 +138,21 @@ pip list | grep datadog  # Should show datadog version
 
 ## Step 4: Configure Environment (2 minutes)
 
-### 4.1 Create Environment File (Optional)
+### 4.1 Environment Variables (Required vs Optional)
+
+The application adheres to 12-factor app principles. Configuration is strictly via environment variables.
+
+| Variable | Status | Description |
+|----------|--------|-------------|
+| `GCP_PROJECT_ID` | **REQUIRED** | Your Google Cloud Project ID. App will **fail** without this. |
+| `DD_API_KEY` | **REQUIRED** | Your Datadog API Key. |
+| `DD_SITE` | Optional | Datadog site (default: `datadoghq.com`). |
+| `DD_ENV` | Optional | Environment tag (default: `production`). |
+| `DD_SERVICE` | Optional | Service name (default: `llm-incident-commander`). |
+| `VERTEX_AI_MODEL`| Optional | Model to use (default: `gemini-2.0-flash`). |
+| `GOOGLE_APPLICATION_CREDENTIALS` | **REQUIRED (Local)** | Path to service account JSON (not needed in Cloud Run). |
+
+### 4.2 Local Setup (.env)
 
 ```bash
 # Create .env file (optional, or export directly)

@@ -84,6 +84,20 @@ Observability is therefore centered on LLM behavior rather than traditional back
 
 ---
 
+## 🔐 Security & Secret Management
+
+**Zero-Trust, Fail-Closed Architecture**
+
+This repository enforces strict security practices suitable for production environments:
+
+- **No Embedded Secrets**: Source code contains **zero** API keys, Service Account credentials, or private tokens.
+- **Fail-Closed Config**: The application will **refuse to start** if required environment variables (like `GCP_PROJECT_ID`) are missing.
+- **Identity-Based Auth**: Google Cloud authentication relies entirely on `GOOGLE_APPLICATION_CREDENTIALS` or metadata server identity (in Cloud Run), not hardcoded keys.
+- **Runtime Injection**: All secrets (Datadog API keys, GCP project IDs) must be injected at runtime via environment variables or secret managers.
+- **Judge-Safe**: Judges can clone and inspect this repo safely. To run it, you **must** supply your own credentials.
+
+---
+
 ## ✨ Key Innovations
 
 ### 1. **Semantic Hallucination Detection via LLM-as-a-Judge** 🧠 ⭐ NEW
@@ -121,7 +135,7 @@ Per-request actual cost calculation based on official Gemini pricing. Pricing co
 Auto-created incidents include APM traces, error logs, and runbooks.
 
 ### 4. **Traffic Generation** 🎭
-> **Note**: Incident-triggering traffic was generated externally using a custom script during testing to validate monitors and SLOs. The generator script is excluded from the repository to keep the submission minimal.
+> **For Judges**: A complete traffic generator is included in `traffic-generator/` to help you verify the monitors and dashboards. It creates realistic load, errors, and hallucination scenarios to trigger the Datadog alerts.
 
 ### 5. **SLOs with Error Budgets** 🎯
 Availability, latency, and error rate SLOs with burn rate tracking.

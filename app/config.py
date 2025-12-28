@@ -10,10 +10,8 @@ class Config:
     # Google Cloud / Vertex AI
     GCP_PROJECT_ID: str = os.getenv("GCP_PROJECT_ID")
     if not GCP_PROJECT_ID:
-        # Fail fast if project ID is missing (Security Best Practice)
-        # However, for local dev without vector search, we might allow it to pass 
-        # but we must not commit internal IDs.
-        pass 
+        # FAIL CLOSED: The application must not start without a project ID.
+        raise ValueError("GCP_PROJECT_ID environment variable is validation required. Cannot start without Google Cloud Project ID.") 
 
     GCP_LOCATION: str = os.getenv("GCP_LOCATION", "us-central1")
     VERTEX_AI_MODEL: str = os.getenv("VERTEX_AI_MODEL", "gemini-2.0-flash")
