@@ -55,7 +55,8 @@ def get_vector_store():
             index_id=config.VS_INDEX_ID,
             endpoint_id=config.VS_ENDPOINT_ID,
             embedding=embeddings,
-            stream_update=False  # Read-only for RAG
+            stream_update=True,  # Must match Index configuration
+            private_service_connect_ip_address=None,  # Use public endpoint for local dev
         )
         
         logger.info("✓ Vector Search loaded successfully")
@@ -90,10 +91,10 @@ async def retrieve_context(question: str, k: int = 3, test_mode: str = None) -> 
         try:
             docs = await asyncio.wait_for(
                 asyncio.to_thread(vector_store.similarity_search, question, k=k),
-                timeout=0.8  # 800ms timeout
+                timeout=5.0  # 5 second timeout for cold-start
             )
         except asyncio.TimeoutError:
-            logger.warning("⏱️ Vector Search timeout (800ms) - falling back")
+            logger.warning("⏱️ Vector Search timeout (5s) - falling back")
             statsd.increment("llm.rag.fallback", tags=["reason:timeout"])
             return _retrieve_context_fallback(question)
         
@@ -104,8 +105,9 @@ async def retrieve_context(question: str, k: int = 3, test_mode: str = None) -> 
         retrieval_latency = (time.time() - start_time) * 1000
         
         # Metrics
-        statsd.histogram("llm.retrieval.latency.ms", retrieval_latency)
-        statsd.gauge("llm.retrieval.docs_retrieved", len(docs))
+        statsd.increment("llm.rag.success", tags=["method:vector_search"])
+        statsd.histogram("llm.retrieval.latency.ms", retrieval_latency, tags=["method:vector_search"])
+        statsd.gauge("llm.retrieval.docs_retrieved", len(docs), tags=["method:vector_search"])
         
         logger.debug(f"Retrieved {len(docs)} documents in {retrieval_latency:.2f}ms")
         

@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:latest
+    container_name: datadog-agent
+    environment:
+      DD_API_KEY: ${DD_API_KEY}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      DD_APM_ENABLED: "true"
+      DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"
+      DD_LOGS_ENABLED: "true"
+    ports:
+      - "8125:8125/udp"
+      - "8126:8126"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  llm-incident-commander:
+    build: . # Added this so it builds automatically!
+    image: llm-incident-commander
+    container_name: llm-incident-commander
+    depends_on:
+      - datadog-agent
+    ports:
+      - "8080:8080"
+    environment:
+      DD_AGENT_HOST: datadog-agent
+      DD_SERVICE: llm-incident-commander
+      DD_ENV: production
+      DD_SITE: ${DD_SITE:-us5.datadoghq.com}
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+      # IMPORTANT: Make sure your file in ~/secrets matches this name!
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/llm-incident-commander.json
+      # RAG Config inferred from env or defaults
+      VECTOR_SEARCH_ENABLED: "true"
+    volumes:
+      - ~/secrets:/secrets
+    restart: unless-stopped

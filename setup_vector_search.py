@@ -92,11 +92,17 @@ def deploy_index(index, endpoint):
              return
              
     print("Deploying index to endpoint (this takes ~15-20 mins)...")
-    endpoint.deploy_index(
-        index=index,
-        deployed_index_id="deployed_index_1"
-    )
-    print("✓ Index deployed successfully")
+    try:
+        endpoint.deploy_index(
+            index=index,
+            deployed_index_id="deployed_index_1"
+        )
+        print("✓ Index deployed successfully")
+    except Exception as e:
+        if "AlreadyExists" in str(e) or "already exists" in str(e):
+            print("✓ Index already deployed (caught exception)")
+        else:
+            raise e
 
 def main():
     print("\n🚀 VECTOR SEARCH SETUP")
@@ -141,7 +147,8 @@ def main():
             gcs_bucket_name=BUCKET_NAME,
             index_id=index.resource_name.split("/")[-1],
             endpoint_id=endpoint.resource_name.split("/")[-1],
-            embedding=embeddings
+            embedding=embeddings,
+            stream_update=True
         )
         
         # 4. Add Documents
