@@ -87,7 +87,7 @@ def init_routes(templates: Jinja2Templates, model, app_start_time: float):
         variant = get_experiment_variant(request_id)
         
         # RAG: Retrieve context from knowledge base (Vector Search)
-        context = retrieve_context(
+        context = await retrieve_context(
             question=req.question,
             k=3,
             test_mode=req.test_mode  # Pass test mode for poisoning

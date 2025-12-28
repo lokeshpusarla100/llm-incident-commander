@@ -202,7 +202,7 @@ export DD_LOGS_INJECTION="true"
 
 ## Step 5: Run Application (2 minutes)
 
-### 5.1 Start the Server
+### 5.1 Start the Server (Local Python)
 
 ```bash
 # Make sure virtual environment is activated
@@ -211,6 +211,28 @@ source venv/bin/activate
 # Run with Datadog tracing
 ddtrace-run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+### 5.2 Alternative: Run with Docker
+
+If you prefer containers:
+
+1. **Build the image**:
+   ```bash
+   docker build -t llm-incident-commander .
+   ```
+
+2. **Run the container**:
+   ```bash
+   # We need to pass:
+   # 1. Environment variables (-e or --env-file)
+   # 2. Google Cloud credentials (via volume mount)
+   
+   docker run -p 8080:8080 \
+     --env-file .env \
+     -v $HOME/.config/gcloud:/home/appuser/.config/gcloud \
+     llm-incident-commander
+   ```
+   *Note: The volume mount relies on you having run `gcloud auth application-default login` on your host machine.*
 
 You should see output like:
 ```

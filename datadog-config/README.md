@@ -1,6 +1,10 @@
 # Datadog Configuration Guide
 
-This directory contains all Datadog configurations for the LLM Incident Commander project, including monitors, SLOs, dashboards, and incident management setup.
+The `datadog-config/` directory contains **IaC-style JSON exports** of the Datadog dashboards, monitors, and SLOs that were manually created and validated in the Datadog UI.
+
+> This approach mirrors real-world enterprise workflows, where application teams emit telemetry while observability teams define detection and reliability policy declaratively.
+
+**Note:** These JSON files are exported representations of Datadog resources created and validated in the Datadog UI. They are not auto-applied by the application.
 
 ## 📋 Contents
 

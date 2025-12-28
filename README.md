@@ -144,6 +144,30 @@ Availability, latency, and error rate SLOs with burn rate tracking.
 
 ## 🚀 Quick Start
 
+You can run the application using **Docker (Recommended)** or **Local Python**.
+
+### Option A: Run with Docker 🐳
+
+The easiest way to run the judge-safe environment.
+
+```bash
+# 1. Build the image
+docker build -t llm-incident-commander .
+
+# 2. Run with environment variables
+# Note: You must provide your own credentials.
+docker run -p 8080:8080 \
+  -e GCP_PROJECT_ID="your-project-id" \
+  -e DD_API_KEY="your-datadog-key" \
+  -e VERTEX_AI_MODEL="gemini-2.0-flash" \
+  -v $HOME/.config/gcloud:/root/.config/gcloud \
+  llm-incident-commander
+```
+
+> **Note on GCP Auth**: The `-v` flag above mounts your local gcloud credentials into the container. Alternatively, use `GOOGLE_APPLICATION_CREDENTIALS`.
+
+### Option B: Local Python Setup
+
 ### Prerequisites
 
 - Python 3.12+
