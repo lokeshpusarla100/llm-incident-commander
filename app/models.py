@@ -10,7 +10,8 @@ class AskRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=5000, description="Question to ask the LLM")
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Override default temperature")
     max_tokens: Optional[int] = Field(None, ge=1, le=8192, description="Override max output tokens")
-    test_mode: Optional[str] = Field(None, description="Test mode trigger: 'hallucination' or null")
+    test_mode: Optional[str] = Field(None, description="Test mode trigger: 'hallucination', 'cost', or null")
+    needs_reasoning: Optional[bool] = Field(None, description="Explicitly request LLM reasoning (overrides vector-search-only default)")
 
 
 class AskResponse(BaseModel):
@@ -22,8 +23,10 @@ class AskResponse(BaseModel):
     tokens: dict
     cost_usd: float
     hallucination_score: float
-    status: str = "success"  # success | blocked
+    status: str = "success"  # success | blocked | vector_only | rag_disabled
     message: Optional[str] = None
+    source: str = "vector_search"  # "vector_search" | "llm_generation" | "disabled"
+    llm_invocation_reason: Optional[str] = None  # Why LLM was called (if at all)
 
 
 class HealthResponse(BaseModel):

@@ -163,12 +163,17 @@ cp /path/to/your-service-account.json ~/secrets/llm-incident-commander.json
 docker-compose up --build
 ```
 
-App: `http://localhost:8080` • Generate traffic with `traffic-generator/` (see below)
+App: `http://localhost:8080` • Generate traffic:
+```bash
+python3 traffic-generator/advanced_traffic_generator.py --port 8080 --rps 2
+```
 
 <details>
 <summary>Local Development (without Docker)</summary>
 
 ```bash
+# Ensure dependencies are installed first: pip install -r requirements.txt
+# Default uses port 8000
 python3 traffic-generator/advanced_traffic_generator.py --rps 2 --duration 300
 ```
 
@@ -184,6 +189,107 @@ pip install -r requirements.txt
 gcloud auth application-default login
 export GCP_PROJECT_ID="your-project-id" DD_API_KEY="your-datadog-key"
 ddtrace-run uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+</details>
+
+---
+
+## ⚙️ Configuration & Operation Modes
+
+The application supports three operation modes to balance functionality and cost. The **Default Mode** allows immediate testing of Gemini 2.0 without complex infrastructure.
+
+### 1. Gemini Only Mode (Default)
+> **Active by default.** Uses Gemini 2.0 Flash but skips Vector Search (RAG).
+
+- **Behavior**: Application calls Gemini with the user's query directly (no retrieved context).
+- **Cost**: Incurs standard Gemini API costs (low).
+- **Setup**: Zero setup required (beyond authentication).
+- **Config**: `SAFE_MODE=false`, `ENABLE_LLM_GENERATION=true`, `VECTOR_SEARCH_ENABLED=false`
+
+### 2. Full RAG Mode (Production)
+> **Requires Infrastructure.** Uses Gemini 2.0 + Vertex AI Vector Search.
+
+- **Behavior**: Retrieves relevant context, then calls Gemini.
+- **Cost**: Incurs Gemini costs + Vector Search hourly infrastructure costs.
+- **Setup**: Run `setup_vector_search.py` (see below).
+- **Config**: `SAFE_MODE=false`, `VECTOR_SEARCH_ENABLED=true`
+
+### 3. Safe Mode (Zero Cost)
+> **Cost Protection.** Blocks all external API calls.
+
+- **Behavior**: Returns static "disabled" responses.
+- **Cost**: **$0.00 guaranteed.**
+- **Use Case**: Testing UI, Datadog traces, or logic without wallet impact.
+- **Config**: `SAFE_MODE=true`
+
+---
+
+## 🛡️ Safe Mode & Defaults
+
+To switch to **Safe Mode** (Zero Cost), set this in your `.env`:
+
+```bash
+export SAFE_MODE=true
+```
+
+In Safe Mode, the application returns:
+```json
+{
+  "status": "rag_disabled",
+  "source": "disabled",
+  "answer": "Vector Search is currently disabled. See README for on-demand setup.",
+  "cost_usd": 0.0
+}
+```
+
+---
+
+## 🔍 Vector Search (On-Demand Infrastructure)
+
+> **Vector Search infrastructure is intentionally undeployed to prevent idle costs.**
+
+### Why On-Demand?
+
+During development, we observed that **Vertex AI Vector Search is billed per-hour when an index is deployed**, regardless of query volume. A single deployed endpoint incurs continuous costs (~₹5k/day equivalent).
+
+Because:
+- Hackathon results are announced months later
+- Judges do not specify when or whether they will run live infrastructure
+- Always-on paid infra is financially irresponsible
+
+We **intentionally undeploy the index endpoint** and use an **on-demand infrastructure model**. This matches real enterprise practice: infrastructure is provisioned only when needed, not kept running idle.
+
+### Enabling Vector Search
+
+To enable Vector Search for live evaluation:
+
+```bash
+# 1. Deploy infrastructure (provisions billable resources)
+python setup_vector_search.py
+
+# 2. Wait ~5-10 minutes for index readiness
+
+# 3. Disable Safe Mode and restart
+export SAFE_MODE=false
+export ENABLE_LLM_GENERATION=true  # Optional: enable LLM reasoning
+ddtrace-run uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+> ⚠️ **Running `setup_vector_search.py` provisions billable infrastructure.**
+> Delete or undeploy the index after use to avoid ongoing costs.
+
+### Disabling Vector Search After Use
+
+```bash
+# Undeploy to stop hourly costs (keeps index for future redeployment)
+gcloud ai index-endpoints undeploy-index YOUR_ENDPOINT_ID \
+  --deployed-index-id=YOUR_DEPLOYED_INDEX_ID \
+  --region=us-central1
+
+# Or delete entirely
+gcloud ai indexes delete YOUR_INDEX_ID --region=us-central1
+gcloud ai index-endpoints delete YOUR_ENDPOINT_ID --region=us-central1
 ```
 
 ---
@@ -271,8 +377,7 @@ llm-incident-commander/
 │   └── logging_config.py    # Structured JSON logging for Datadog
 │
 ├── traffic-generator/
-│   ├── advanced_traffic_generator.py  # Advanced traffic generator
-│   └── generate_traffic.sh            # Simple bash traffic generator
+│   └── advanced_traffic_generator.py  # Advanced traffic generator
 │
 ├── datadog-config/
 │   ├── monitors/            # Monitor JSON exports (4 monitors)

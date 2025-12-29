@@ -32,6 +32,29 @@ class Config:
     LLM_MAX_OUTPUT_TOKENS: int = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "512"))
     LLM_TIMEOUT_SECONDS: int = int(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
     
+    # =========================================================================
+    # Cost-Safety Controls (CRITICAL for production)
+    # =========================================================================
+    # SAFE_MODE: Disables all cloud infra assumptions. Default: FALSE (Active).
+    # User requested active Gemini by default.
+    SAFE_MODE: bool = os.getenv("SAFE_MODE", "false").lower() == "true"
+    
+    # DISABLE LLM generation by default - vector search only responds
+    # User requested Gemini ENABLED by default
+    ENABLE_LLM_GENERATION: bool = os.getenv("ENABLE_LLM_GENERATION", "true").lower() == "true"
+    
+    # Similarity threshold: if best_score >= this, skip LLM and return RAG directly
+    LLM_SIMILARITY_THRESHOLD: float = float(os.getenv("LLM_SIMILARITY_THRESHOLD", "0.7"))
+    
+    # Rate limit for Gemini calls per hour (per instance)
+    LLM_RATE_LIMIT_PER_HOUR: int = int(os.getenv("LLM_RATE_LIMIT_PER_HOUR", "100"))
+    
+    # Hard cap on output tokens (overrides per-request max_tokens)
+    LLM_MAX_OUTPUT_TOKENS_CAP: int = int(os.getenv("LLM_MAX_OUTPUT_TOKENS_CAP", "1024"))
+    
+    # Panic threshold: at 90% rate limit usage, skip LLM and emit risk signal
+    LLM_PANIC_THRESHOLD: float = float(os.getenv("LLM_PANIC_THRESHOLD", "0.9"))
+    
     # Pricing (Gemini 2.0 Flash pricing as of Dec 2024)
     # Source: https://cloud.google.com/vertex-ai/pricing#generative-ai-models
     GEMINI_PRICING_MAP = {
@@ -117,16 +140,42 @@ class Config:
     
     CURRENT_SENSITIVITY: str = "balanced"
     
-    # Vector Search Configuration
-    VECTOR_SEARCH_ENABLED: bool = True
+    # =========================================================================
+    # Vector Search Configuration (ON-DEMAND INFRASTRUCTURE)
+    # =========================================================================
+    # Vector Search uses per-hour billing when deployed. We intentionally
+    # undeploy the index endpoint when not in active use to avoid idle costs.
+    # This is standard enterprise practice for cost-responsible cloud usage.
+    #
+    # To enable Vector Search:
+    #   1. Run: python setup_vector_search.py
+    #   2. Wait ~5-10 minutes for index readiness
+    #   3. Set SAFE_MODE=false and restart
+    # =========================================================================
+    
+    # Enable/disable Vector Search (auto-disabled in SAFE_MODE)
+    # User requested DISABLED by default (On-Demand only)
+    VECTOR_SEARCH_ENABLED: bool = os.getenv("VECTOR_SEARCH_ENABLED", "false").lower() == "true"
     VECTOR_SEARCH_K: int = 3  # Number of documents to retrieve
     VECTOR_SEARCH_EMBEDDING_MODEL: str = "text-embedding-004"
     
-    # RAG Infrastructure (Set these in your .env file)
-    # Run: export VS_INDEX_ID=... or add to .env
+    # RAG Infrastructure IDs (empty = Vector Search unavailable)
+    # These are populated by setup_vector_search.py when infra is deployed
     VS_INDEX_ID: str = os.getenv("VS_INDEX_ID", "")
     VS_ENDPOINT_ID: str = os.getenv("VS_ENDPOINT_ID", "")
     VS_BUCKET_NAME: str = os.getenv("VS_BUCKET_NAME", "")
+    
+    @classmethod
+    def is_vector_search_available(cls) -> bool:
+        """
+        Check if Vector Search infrastructure is available.
+        Returns False if SAFE_MODE is on or if required IDs are missing.
+        """
+        if cls.SAFE_MODE:
+            return False
+        if not cls.VECTOR_SEARCH_ENABLED:
+            return False
+        return bool(cls.VS_INDEX_ID and cls.VS_ENDPOINT_ID and cls.VS_BUCKET_NAME)
 
 
 config = Config()

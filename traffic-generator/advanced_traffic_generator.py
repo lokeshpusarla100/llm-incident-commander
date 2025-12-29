@@ -471,6 +471,11 @@ def main():
         help="Base URL of the service (default: http://localhost:8000)"
     )
     parser.add_argument(
+        "--port",
+        type=int,
+        help="Override default port (e.g., 8080 for Docker). Overwrites --url if set."
+    )
+    parser.add_argument(
         "--rps",
         type=float,
         default=2.0,
@@ -505,6 +510,11 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    # Handle port override
+    if args.port:
+        args.url = f"http://localhost:{args.port}"
+        print(f"ℹ️  Overriding URL to {args.url} (via --port {args.port})")
     
     # Test connection if requested
     if args.test_connection:
