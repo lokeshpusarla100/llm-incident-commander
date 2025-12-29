@@ -1,31 +1,40 @@
+<!-- > NOTE: These SLOs are illustrative and chosen for a hackathon/demo environment.
+> In real production systems, thresholds would be calibrated using historical traffic
+> and business requirements. -->
+
+
+> **NOTE**: These SLOs are illustrative and chosen for a hackathon/demo environment.
+> In real production systems, thresholds would be calibrated using historical traffic
+> and business requirements.
+
 # SLO Threshold Justification
 
 This document provides data-driven rationale for the SLO thresholds defined for LLM Incident Commander.
 
 ---
 
-## 1. Availability SLO: 95% over 7 days
+## 1. Availability SLO: 99% over 30 days
 
 **Rationale:**
-- Allows for ~8.4 hours of downtime per week for maintenance
-- Aligns with Google Cloud Run SLA (95% uptime for single-region deployments)
-- Acceptable for internal tooling (non-customer-facing)
+- Aligns with standard enterprise SLOs (99% uptime)
+- 1% error budget allows for occasional transient LLM API failures
+- Measured over 30 days to smooth out volatility
 
 **Industry Benchmarks:**
-- AWS Lambda: 99.95% 
 - OpenAI API: 99.9%
-- Our app has single-region deployment, hence lower target
+- Standard Web Services: 99.9%
+- Our target (99%): Realistic for a hackathon/demo environment
 
 **Error Budget:**
-- 5% of requests can fail = ~36 failures per 720 requests/day at 1 RPS baseline
+- 1% of requests can fail (~7.2 hours/month allowed downtime)
 
 ---
 
 ## 2. Latency SLO: 95% of requests < 2000ms (7-day window)
 
 **Rationale:**
-- Gemini 2.0 Flash P50 latency = ~800ms (measured via traffic generator)
-- P95 latency = ~1500ms (measured)
+- Gemini 2.0 Flash P50 latency = ~800ms
+- P95 latency = ~1500ms
 - 2000ms threshold = P95 + 500ms buffer for network variance
 
 **User Expectation:**
@@ -33,24 +42,22 @@ This document provides data-driven rationale for the SLO thresholds defined for 
 - Incident response context: SREs expect near-real-time answers
 
 **Impact if Breached:**
-- 5% of users wait >2s (degraded UX for incident response)
+- 5% of users wait >2s (degraded UX)
 
 ---
 
-## 3. Error Rate SLO: <5% over 30 days
+## 3. Error Rate SLO: <1% over 7 days
 
 **Rationale:**
-- Vertex AI quota errors = ~2% (measured during load testing)
-- Hallucination failures = ~1-3% (judge detection rate)
-- Total expected error rate = ~3-5%
+- Vertex AI quota errors are typically handled by retry logic (not implemented here for clarity)
+- 1% threshold is strict enough to catch systemic issues like quota exhaustion
 
 **Industry Benchmark:**
 - OpenAI API reliability = 99.9% (0.1% error rate)
 
 **Why Higher Than Industry:**
-1. Free tier quota limits
-2. Single-retry policy (production would use 3+ retries)
-3. No fallback model provider
+- Free tier quota limits are stricter
+- No complex retry/backoff implementation in this demo
 
 ---
 
@@ -72,6 +79,6 @@ SLO thresholds should be reviewed:
 
 | SLO | Current Target | Review Date |
 |-----|----------------|-------------|
-| Availability | 95% / 7d | 2025-01-27 |
+| Availability | 99% / 30d | 2025-01-27 |
 | Latency | 95% < 2000ms / 7d | 2025-01-27 |
-| Error Rate | <5% / 30d | 2025-01-27 |
+| Error Rate | <1% / 7d | 2025-01-27 |

@@ -18,7 +18,7 @@ ddtrace-debug.log
 # Documentation and scripts not needed in production image
 *.md
 LICENSE
-deploy_vector_search.sh
+
 setup_vector_search.py
 docs/
 

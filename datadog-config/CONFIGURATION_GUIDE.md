@@ -24,6 +24,10 @@ export DD_SERVICE="llm-incident-commander"
 export DD_ENV="production"
 export DD_VERSION="1.0.0"
 export DD_LOGS_INJECTION="true"
+
+# GCP Configuration (Required for app to start)
+export GCP_PROJECT_ID="your-project-id"
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/key.json"
 ```
 
 ### Verify APM is Working
