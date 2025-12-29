@@ -2,6 +2,38 @@
 """
 Advanced Traffic Generator for LLM Incident Commander
 Generates diverse traffic patterns to trigger Datadog monitors and demonstrate observability.
+
+"The UI validates individual requests.
+ This traffic generator validates system behavior under realistic failure modes."
+
+This generator uses scenario hints only to label traffic.
+All observability signals are derived from real execution,
+not synthetic responses.
+
+Scenario → Expected Observability Signal Mapping:
+
+NORMAL:
+- Baseline latency, cost, success rate
+
+SLOW_QUERY:
+- Latency P95/P99 increase
+- Latency SLO burn
+
+COST_SPIKE:
+- Token usage spike (2500+ word responses)
+- Cost per minute anomaly
+
+HALLUCINATION_TRIGGER:
+- Elevated hallucination judge score
+- Case creation
+
+INVALID_INPUT:
+- Error rate increase
+- Input validation signals
+
+BURST:
+- Sudden latency spike
+- Throughput saturation
 """
 import argparse
 import asyncio
@@ -26,6 +58,13 @@ class ScenarioType(Enum):
     HALLUCINATION_TRIGGER = "hallucination_trigger"
     COST_SPIKE = "cost_spike"
     BURST = "burst"
+
+
+class TrafficProfile(Enum):
+    """Traffic profile determines scenario distribution weights"""
+    DEMO = "demo"        # Fast incident triggering (screenshots/video)
+    SOAK = "soak"        # Long-running baseline
+    CHAOS = "chaos"      # Aggressive failure injection
 
 
 @dataclass
@@ -104,12 +143,21 @@ class TrafficGenerator:
         "Why did issue #{} happen on February 30th, 2024 at 25:99 PM?",
     ]
     
+    # WARNING: COST_SPIKE intentionally generates high token usage.
+    # Use only for short demo runs. Token-heavy questions cause real cost spikes.
+    COST_SPIKE_QUESTIONS = [
+        "Write a 2500-word detailed incident postmortem for incident #{} including executive summary, root cause, contributing factors, timelines, remediation steps, and prevention plan.",
+        "Generate a deep technical explanation of every subsystem involved in incident #{} with examples and long-form analysis.",
+    ]
+    
     def __init__(
         self,
         base_url: str = "http://localhost:8000",
         rps: float = 2.0,
         duration_seconds: int = 300,
-        scenario: Optional[ScenarioType] = None
+        scenario: Optional[ScenarioType] = None,
+        profile: TrafficProfile = TrafficProfile.DEMO,
+        quiet: bool = False
     ):
         """
         Initialize traffic generator.
@@ -119,11 +167,15 @@ class TrafficGenerator:
             rps: Requests per second
             duration_seconds: How long to run (0 = infinite)
             scenario: Specific scenario to run, or None for mixed
+            profile: Traffic profile (demo/soak/chaos) for scenario weights
+            quiet: Minimal output mode (recommended for video)
         """
         self.base_url = base_url
         self.rps = rps
         self.duration_seconds = duration_seconds
         self.scenario = scenario
+        self.profile = profile
+        self.quiet = quiet
         self.stats = TrafficStats()
         self.running = False
         self.start_time = None
@@ -145,6 +197,11 @@ class TrafficGenerator:
             template = random.choice(self.HALLUCINATION_TRIGGERS)
             return template.format(counter)
         
+        elif scenario == ScenarioType.COST_SPIKE:
+            # Token-heavy questions that cause real cost spikes
+            template = random.choice(self.COST_SPIKE_QUESTIONS)
+            return template.format(counter)
+        
         elif scenario == ScenarioType.BURST:
             # Burst uses normal questions but sent rapidly
             template = random.choice(self.NORMAL_QUESTIONS)
@@ -154,24 +211,53 @@ class TrafficGenerator:
     
     def _select_scenario(self) -> ScenarioType:
         """
-        Select scenario based on weights.
-        Distribution designed to trigger monitors periodically.
+        Select scenario based on profile-aware weights.
+        Distribution designed to trigger monitors per intent.
         """
         if self.scenario:
             return self.scenario
         
-        # Weighted random selection
-        # 70% normal, 15% slow, 10% hallucination, 5% invalid
-        rand = random.random()
+        r = random.random()
         
-        if rand < 0.70:
-            return ScenarioType.NORMAL
-        elif rand < 0.85:
-            return ScenarioType.SLOW_QUERY
-        elif rand < 0.95:
-            return ScenarioType.HALLUCINATION_TRIGGER
-        else:
-            return ScenarioType.INVALID_INPUT
+        if self.profile == TrafficProfile.DEMO:
+            # Designed to trigger monitors fast (for screenshots/video)
+            if r < 0.50:
+                return ScenarioType.NORMAL
+            elif r < 0.62:
+                return ScenarioType.SLOW_QUERY
+            elif r < 0.74:
+                return ScenarioType.COST_SPIKE
+            elif r < 0.86:
+                return ScenarioType.HALLUCINATION_TRIGGER
+            elif r < 0.95:
+                return ScenarioType.BURST
+            else:
+                return ScenarioType.INVALID_INPUT
+        
+        elif self.profile == TrafficProfile.SOAK:
+            # Mostly clean traffic (long-running baseline)
+            if r < 0.90:
+                return ScenarioType.NORMAL
+            elif r < 0.95:
+                return ScenarioType.SLOW_QUERY
+            else:
+                return ScenarioType.HALLUCINATION_TRIGGER
+        
+        elif self.profile == TrafficProfile.CHAOS:
+            # Maximum pain (aggressive failure injection)
+            if r < 0.25:
+                return ScenarioType.COST_SPIKE
+            elif r < 0.45:
+                return ScenarioType.SLOW_QUERY
+            elif r < 0.65:
+                return ScenarioType.HALLUCINATION_TRIGGER
+            elif r < 0.85:
+                return ScenarioType.BURST
+            else:
+                return ScenarioType.INVALID_INPUT
+        
+        # Fallback to normal
+        return ScenarioType.NORMAL
     
     async def _send_request(
         self,
@@ -184,12 +270,18 @@ class TrafficGenerator:
         start = time.time()
         
         try:
-            # Build payload with test_mode for specific scenarios
+            # Build payload with scenario_hint for labeling (not synthetic responses)
             payload = {"question": question}
-            if scenario == ScenarioType.HALLUCINATION_TRIGGER:
-                payload["test_mode"] = "hallucination"
-            elif scenario == ScenarioType.COST_SPIKE:
-                payload["test_mode"] = "cost"
+            # Attach scenario hint as metadata for log correlation
+            # AND map to test_mode for backend compatibility (triggers safety block logic)
+            payload["scenario_hint"] = scenario.value
+            if scenario in [ScenarioType.HALLUCINATION_TRIGGER, ScenarioType.COST_SPIKE]:
+                # Map enum value to backend expected string ('hallucination_trigger' -> 'hallucination')
+                mode_map = {
+                    "hallucination_trigger": "hallucination",
+                    "cost_spike": "cost"
+                }
+                payload["test_mode"] = mode_map.get(scenario.value, scenario.value)
             
             response = await client.post(
                 f"{self.base_url}/ask",
@@ -207,34 +299,44 @@ class TrafficGenerator:
                 self.stats.total_latency_ms += latency_ms
                 
                 data = response.json()
-                print(
-                    f"✓ [{counter:04d}] {scenario.value:20s} | "
-                    f"{latency_ms:5d}ms | "
-                    f"tokens={data.get('tokens', {}).get('total', 0):4d} | "
-                    f"cost=${data.get('cost_usd', 0):.6f}"
-                )
+                
+                # DEBUG: Check if we are actually getting blocked
+                answer_snippet = data.get("answer", "")[:60].replace("\n", " ")
+                status_block = "⛔ BLOCKED" if "BLOCKED" in answer_snippet else "✅ ALLOWED"
+                
+                if not self.quiet:
+                    print(
+                        f"✓ [{counter:04d}] {scenario.value:20s} | "
+                        f"{latency_ms:5d}ms | "
+                        f"{status_block} | "
+                        f"tokens={data.get('tokens', {}).get('total', 0):4d} | "
+                        f"cost=${data.get('cost_usd', 0):.6f}"
+                    )
             else:
                 self.stats.failed += 1
                 error_type = f"http_{response.status_code}"
                 self.stats.errors_by_type[error_type] += 1
                 
-                print(
-                    f"✗ [{counter:04d}] {scenario.value:20s} | "
-                    f"{latency_ms:5d}ms | "
-                    f"HTTP {response.status_code}"
-                )
+                if not self.quiet:
+                    print(
+                        f"✗ [{counter:04d}] {scenario.value:20s} | "
+                        f"{latency_ms:5d}ms | "
+                        f"HTTP {response.status_code}"
+                    )
         
         except httpx.TimeoutException:
             self.stats.total_requests += 1
             self.stats.failed += 1
             self.stats.errors_by_type["timeout"] += 1
-            print(f"✗ [{counter:04d}] {scenario.value:20s} | TIMEOUT")
+            if not self.quiet:
+                print(f"✗ [{counter:04d}] {scenario.value:20s} | TIMEOUT")
         
         except Exception as e:
             self.stats.total_requests += 1
             self.stats.failed += 1
             self.stats.errors_by_type["exception"] += 1
-            print(f"✗ [{counter:04d}] {scenario.value:20s} | ERROR: {str(e)[:50]}")
+            if not self.quiet:
+                print(f"✗ [{counter:04d}] {scenario.value:20s} | ERROR: {str(e)[:50]}")
     
     def _print_stats(self) -> None:
         """Print current statistics"""
@@ -272,13 +374,15 @@ class TrafficGenerator:
         self.start_time = time.time()
         counter = 1
         
-        print(f"\n🚀 Starting Traffic Generator")
-        print(f"Target: {self.base_url}")
-        print(f"RPS: {self.rps}")
-        print(f"Duration: {self.duration_seconds}s" if self.duration_seconds > 0 else "Duration: infinite")
-        print(f"Scenario: {self.scenario.value if self.scenario else 'mixed'}")
-        print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("="*80 + "\n")
+        if not self.quiet:
+            print(f"\n🚀 Starting Traffic Generator")
+            print(f"Target: {self.base_url}")
+            print(f"Profile: {self.profile.value}")
+            print(f"RPS: {self.rps}")
+            print(f"Duration: {self.duration_seconds}s" if self.duration_seconds > 0 else "Duration: infinite")
+            print(f"Scenario: {self.scenario.value if self.scenario else 'mixed'}")
+            print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print("="*80 + "\n")
         
         delay_between_requests = 1.0 / self.rps
         
@@ -293,6 +397,24 @@ class TrafficGenerator:
                     
                     # Select scenario and generate question
                     scenario = self._select_scenario()
+                    
+                    # Handle BURST scenario with concurrent requests
+                    if scenario == ScenarioType.BURST:
+                        tasks = []
+                        # Cap burst size to prevent client-side socket saturation
+                        burst_size = min(int(self.rps * 4), 20)
+                        
+                        for _ in range(burst_size):
+                            q = self._get_question(ScenarioType.NORMAL, counter)
+                            tasks.append(
+                                self._send_request(client, q, scenario, counter)
+                            )
+                            counter += 1
+                        
+                        await asyncio.gather(*tasks)
+                        await asyncio.sleep(1)
+                        continue
+                    
                     question = self._get_question(scenario, counter)
                     
                     # Send request
@@ -301,19 +423,21 @@ class TrafficGenerator:
                     counter += 1
                     
                     # Print stats every 20 requests
-                    if counter % 20 == 0:
+                    if counter % 20 == 0 and not self.quiet:
                         self._print_stats()
                     
                     # Rate limiting
                     await asyncio.sleep(delay_between_requests)
             
             except KeyboardInterrupt:
-                print("\n\n⚠️  Interrupted by user")
+                if not self.quiet:
+                    print("\n\n⚠️  Interrupted by user")
             
             finally:
                 self.running = False
                 self._print_stats()
-                print(f"✅ Traffic generation completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                if not self.quiet:
+                    print(f"✅ Traffic generation completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 async def test_connection(base_url: str) -> bool:
@@ -364,6 +488,17 @@ def main():
         help="Specific scenario to run (default: mixed)"
     )
     parser.add_argument(
+        "--profile",
+        choices=["demo", "soak", "chaos"],
+        default="demo",
+        help="Traffic profile: demo (fast triggers), soak (baseline), chaos (maximum pain)"
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Minimal output (recommended for video)"
+    )
+    parser.add_argument(
         "--test-connection",
         action="store_true",
         help="Test connection to service and exit"
@@ -379,13 +514,16 @@ def main():
     
     # Convert scenario string to enum
     scenario = ScenarioType(args.scenario) if args.scenario else None
+    profile = TrafficProfile(args.profile)
     
     # Create and run generator
     generator = TrafficGenerator(
         base_url=args.url,
         rps=args.rps,
         duration_seconds=args.duration,
-        scenario=scenario
+        scenario=scenario,
+        profile=profile,
+        quiet=args.quiet
     )
     
     try:
