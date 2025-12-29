@@ -372,7 +372,11 @@ See `datadog-config/CONFIGURATION_GUIDE.md` for detailed setup instructions.
 ```
 llm-incident-commander/
 ├── app/
-│   ├── main.py              # FastAPI application with Vertex AI integration
+│   ├── main.py              # Application entry point
+│   ├── routes.py            # API endpoints & core logic
+│   ├── rag.py               # Vector Search & Retrieval engine
+│   ├── judge.py             # LLM-as-a-Judge implementation
+│   ├── security.py          # Prompt injection & PII scanners
 │   ├── config.py            # Configuration and pricing constants
 │   └── logging_config.py    # Structured JSON logging for Datadog
 │
@@ -478,7 +482,7 @@ _3-minute walkthrough covering:_
 ## 🏆 Challenge Requirements Checklist
 
 - [x] **LLM Application** powered by Vertex AI (Gemini 2.0 Flash)
-- [x] **3+ Detection Rules** (4 monitors configured)
+- [x] **8+ Detection Rules** (14 monitor configurations provided)
 - [x] **3+ SLOs** with error budgets
 - [x] **Incident Management** - Surfaces actionable records via monitors
 - [x] **Case Management** - Quality issues create cases

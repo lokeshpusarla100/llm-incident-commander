@@ -33,8 +33,13 @@ services:
       GCP_PROJECT_ID: ${GCP_PROJECT_ID}
       # IMPORTANT: Make sure your file in ~/secrets matches this name!
       GOOGLE_APPLICATION_CREDENTIALS: /secrets/llm-incident-commander.json
-      # RAG Config inferred from env or defaults
-      VECTOR_SEARCH_ENABLED: "true"
+      # Pass configuration from .env
+      SAFE_MODE: ${SAFE_MODE}
+      ENABLE_LLM_GENERATION: ${ENABLE_LLM_GENERATION}
+      VECTOR_SEARCH_ENABLED: ${VECTOR_SEARCH_ENABLED}
+      VS_INDEX_ID: ${VS_INDEX_ID}
+      VS_ENDPOINT_ID: ${VS_ENDPOINT_ID}
+      VS_BUCKET_NAME: ${VS_BUCKET_NAME}
     volumes:
       - ~/secrets:/secrets
     restart: unless-stopped
