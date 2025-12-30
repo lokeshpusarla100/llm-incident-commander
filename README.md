@@ -2,6 +2,8 @@
 
 **A Datadog-native control plane for governing, monitoring, and scaling Large Language Model applications.**
 
+[![Demo Video](https://img.shields.io/badge/YouTube-Watch%20Demo-red?style=for-the-badge&logo=youtube)](https://youtu.be/S-2J7KPeD-E)
+
 ---
 
 ## Executive Summary
