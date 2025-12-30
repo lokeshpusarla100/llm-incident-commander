@@ -30,3 +30,11 @@ screenshots/
 # Docker
 Dockerfile
 .dockerignore
+.DS_Store
+*.log
+tmp/
+temp/
+*.swp
+*.zip
+*.tar.gz
+

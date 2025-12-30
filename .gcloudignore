@@ -1,0 +1,22 @@
+# Start with .gitignore logic
+.gitignore
+
+# Explicitly exclude these heavy folders to speed up upload
+# (Even if they are in .gitignore, listing them here is safer)
+.git/
+venv/
+env/
+__pycache__/
+node_modules/
+docs/
+screenshots/
+traffic-generator/
+datadog-config/
+
+# Ignore documentation
+*.md
+LICENSE
+
+# Ignore secrets/env
+.env
+.env.*
