@@ -1,638 +1,200 @@
-# LLM Incident Commander 🚨
+# LLM Incident Commander: Production LLM Observability & Governance
 
-> **AI Accelerate: Google Cloud Partnerships - Datadog Challenge**  
-> End-to-end observability monitoring strategy for an LLM application powered by Vertex AI with comprehensive Datadog integration.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Datadog](https://img.shields.io/badge/Datadog-632CA6?logo=datadog&logoColor=fff)](https://www.datadoghq.com/)
-[![Google Cloud](https://img.shields.io/badge/Google%20Cloud-4285F4?logo=googlecloud&logoColor=fff)](https://cloud.google.com/)
-
-## 📖 Overview
-
-LLM Incident Commander is a minimal LLM-powered assistant designed to demonstrate how Datadog detects, explains, and escalates failures in production LLM workloads.
-
-> **The application is intentionally simple (a chatbot/assistant); the innovation lies in how Datadog observes, detects, and responds to LLM failures, not in UI complexity.**
-
-> **Control-Plane Architecture**: The application emits LLM telemetry (tokens, costs, hallucination scores). Datadog evaluates system-level behavior using monitors and surfaces actionable records (alerts, incidents, cases) when thresholds are breached. The application enforces per-request safety policy (e.g., blocking hallucinated responses) based on real-time analysis—Datadog is **not in the request execution path**. Datadog provides **system-level governance** through detection rules and incident management.
-
-The system demonstrates enterprise-grade LLM monitoring:
-
-- **🔍 Full-Stack Observability**: APM traces, structured logs, custom metrics
-- **📊 8 Detection Rules**: Monitors for latency, errors, hallucination, quota, cost, abuse, and security
-- **🎯 3 SLOs**: Availability (99%), Latency P95 (<2s), Error Rate (<1%)
-- **⚡ Incident Management**: Surfaces actionable records (alerts/incidents/cases)
-- **💰 Cost Tracking**: Authoritative token and cost tracking from LLM usage_metadata
+**A Datadog-native control plane for governing, monitoring, and scaling Large Language Model applications.**
 
 ---
 
-## 🧑‍💻 User Flow (Minimal by Design)
+## Executive Summary
 
-1. User submits a natural-language request to the assistant (e.g., "Plan a 3-day trip" or "How do I troubleshoot high latency?")
-2. FastAPI backend calls Gemini via Vertex AI
-3. Datadog traces the full request lifecycle
-4. If latency, errors, cost, or quality degrade:
-   - A monitor triggers
-   - Datadog surfaces actionable records; engineers can pivot to related traces and logs via APM correlation
+Large Language Models (LLMs) introduce new classes of failure that traditional APM cannot detect: semantic hallucinations, token cost explosions, nondeterministic latency spikes, and prompt injection attacks.
 
----
+**LLM Incident Commander** demonstrates how to solve these problems by treating the LLM not as a magic box, but as a governed dependency.
 
-## 🧠 Why This Is an LLM Application
+The core philosophy of this project is:
+> **"The most important signal is not what an LLM outputs, but when and why the system decides to use or skip it."**
 
-The core functionality of this system depends on a Large Language Model hosted on Vertex AI (Gemini).
-Every user interaction results in an LLM inference whose **latency, cost, reliability, and output quality**
-directly affect user experience.
-
-**If the LLM is removed, the application ceases to function.**
-
-Observability is therefore centered on LLM behavior rather than traditional backend metrics.
+This system enables Datadog to observe the full lifecycle of an LLM interaction—from the decision to execute, to the cost incurred, to the semantic quality of the result. It treats "skipping the LLM" (due to cost, safety, or policy) as a first-class operational signal, not a failure.
 
 ---
 
-## 🏗️ Architecture
+## What Problem This Solves
 
+Enterprises deploying GenAI face four specific operational risks that this project addresses:
+
+1.  **Silent Cost Explosions**: A looped script or malicious user can generate thousands of dollars in token costs in minutes without triggering standard CPU/Memory alerts.
+2.  **Semantic Hallucination**: Models often return 200 OK responses that are factually incorrect or dangerous.
+3.  **Quota Exhaustion**: API rate limits are hard stop failures that look like standard 429s but require specific remediations (backoff, fallback).
+4.  **Unsafe Execution**: Running LLMs on untrusted input without governance exposes the system to prompt injection.
+
+This project implements a **Control Plane** that governs these risks before, during, and after execution.
+
+---
+
+## How Datadog Is Used
+
+Datadog is not just an observer here; it is the **decision verification layer**. The application emits specialized telemetry that allows Datadog to track the "Control Plane" logic.
+
+### 1. Decision Governance
+The application reports *why* it did or did not call the LLM.
+- **Metric**: `llm.decision.skipped` (tagged with `reason:cost_limit`, `reason:safe_mode`, `reason:policy`)
+- **Metric**: `llm.requests.total` (tagged with `status:success` vs `status:governed_block`)
+
+### 2. Cost & Token Observability
+Every request reports authoritative usage metadata.
+- **Metric**: `llm.tokens.total` (Input vs Output split)
+- **Metric**: `llm.cost.usd` (Estimated real-time cost derived from Gemini pricing models)
+- **Monitor**: **Cost Spike Alert** triggers if cost/minute exceeds safety thresholds.
+
+### 3. Semantic Quality (LLM-as-a-Judge)
+We implement the Datadog "LLM-as-a-Judge" pattern.
+- A secondary, asynchronous LLM evaluates user responses for hallucination.
+- **Metric**: `llm.judge.hallucination_score` (0.0 - 1.0)
+- **Case Management**: High scores (>0.7) automatically open a **Datadog Case** for human review.
+
+### 4. Incident Management
+Monitors are wired directly to Datadog Incident Management.
+- **Latency > 2s** → Creates SEV-3 Incident
+- **Error Rate > 5%** → Creates SEV-2 Incident
+- **Quota Exhaustion** → Creates SEV-1 Incident
+
+---
+
+## Architecture Overview
+
+The system follows a strict separation between the **Control Plane** (Application) and the **Execution Plane** (Model).
+
+### Control Plane (Always On)
+- **Component**: FastAPI Application + Datadog Tracer
+- **Responsibility**: Auth, Rate Limiting, Cost Calculation, Safety Checks, Decision Logging.
+- **Behavior**: Always reliable. Even if the LLM is down, the Control Plane responds with degradation signals.
+
+### Execution Plane (Governed)
+- **Component**: Google Vertex AI (Gemini 2.0 Flash) + Vector Search (RAG).
+- **Responsibility**: Embeddings, Retrieval, Generation.
+- **Behavior**: Usage is optional. The Control Plane can cut off the Execution Plane (e.g., in `SAFE_MODE`) to prevent runaway costs.
+
+### Observability Pipeline
+1.  **Application** emits StatsD metrics + JSON Logs.
+2.  **Datadog Agent** aggregates and forwards to Datadog.
+3.  **Datadog Backend** evaluates Monitors and SLOs.
+4.  **Alerts** trigger Incidents or can trigger Jira/PagerDuty flows.
+
+---
+
+## LLM Governance Model
+
+This application treats LLM execution as a **controlled resource**, not a default right.
+
+### Operation Modes
+The system supports three explicit modes to balance utility and risk:
+
+1.  **Gemini Only Mode (Default)**
+    - **Behavior**: Direct calls to Gemini 2.0 Flash. No Vector Search.
+    - **Use Case**: Standard text generation.
+    - **Governance**: Rate-limited, Cost-tracked.
+
+2.  **Full RAG Mode**
+    - **Behavior**: Vector Search retrieval + Gemini Generation.
+    - **Use Case**: Knowledge-grounded answers.
+    - **Note**: Requires provisioning the Vector Search infrastructure (see "Vector Search" below).
+
+3.  **Safe Mode**
+    - **Behavior**: **Hard Block** on all external API calls.
+    - **Response**: Returns a structured "Disabled" signal (200 OK with `status:disabled`).
+    - **Use Case**: Testing UI/Observability without incurring a single cent.
+    - **Activation**: Set `SAFE_MODE=true`.
+    - **Intent**: Safe Mode is designed to validate observability, governance, and incident logic without executing any external AI dependencies.
+
+---
+
+## Detection Rules & Incident Types
+
+The project includes 8 pre-configured Datadog Monitors corresponding to real failure modes.
+
+| Monitor | Signal | Incident Severity | Why |
+| :--- | :--- | :--- | :--- |
+| **High Latency** | P95 > 2000ms | SEV-3 (configurable threshold) | LLM latency degrades UX significantly. |
+| **Error Rate** | > 5% Failure | SEV-2 (configurable threshold) | Indicates API outage or broken integration. |
+| **Quota Exhaustion** | 10+ Quota Errors | SEV-1 (configurable threshold) | Hard stop on service; requires immediate intervention. |
+| **Cost Spike** | > $0.01 / request | SEV-2 | Protects against budget drain loop. |
+| **Token Explosion** | Input > 2000 tokens | Warning | Detects prompt stuffing or abuse. |
+| **Hallucination** | Score > 0.7 | Case | Quality degradation requires human review, not waking on-call. |
+| **Prompt Injection Indicators** | Regex / heuristic signals | SEV-1 | Critical security event. |
+
+All monitors are exported in `datadog-config/monitors/` as JSON.
+
+---
+
+## Datadog Assets Provided
+
+For reproducibility, we include:
+
+-   **Dashboards**: `datadog-config/dashboards/`
+    -   *LLM Incident Commander - Observability*: A single pane of glass for Cost, Quality, and Latency.
+-   **Monitors**: `datadog-config/monitors/` (8 JSON definitions)
+-   **SLOs**: `datadog-config/slos/`
+    -   Availability (99%), Latency (P95<2s), Error Rate (<1%).
+-   **Incident Templates**: `datadog-config/incident-templates/`
+
+---
+
+## Vector Search (On-Demand Infrastructure)
+
+To align with responsible cost management, **Vertex AI Vector Search infrastructure is not deployed by default**.
+
+Vertex AI charges per-hour for deployed indices, regardless of traffic. Leaving this running 24/7 for a hackathon submission would be financially irresponsible.
+
+**How to Enable:**
+Users can provision the infrastructure on-demand using the included script:
+```bash
+python setup_vector_search.py
 ```
-┌─────────────────┐
-│  User / Traffic │
-│   Generator     │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────────┐
-│   FastAPI + ddtrace │ ◄──────── Datadog APM
-│  (LLM Application)  │
-└────────┬────────────┘
-         │
-         ├──► Vertex AI (Gemini 2.0 Flash)
-         │
-         ├──► StatsD ────────► Datadog Metrics
-         │
-         └──► JSON Logs ─────► Datadog Logs
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │  Datadog Platform   │
-                    ├─────────────────────┤
-                    │ • Monitors (8)      │
-                    │ • SLOs (3)          │
-                    │ • Dashboard         │
-                    │ • Incident Mgmt     │
-                    │ • Case Management   │
-                    └─────────────────────┘
-```
+This script provisions the Index, Endpoint, and Bucket. Once complete, set `VECTOR_SEARCH_ENABLED=true` to activate Full RAG Mode.
 
-> The architecture is intentionally linear to make LLM latency, cost, and failure modes directly observable in Datadog.
+**Ideally**, organizations should use this pattern to spin up ephemeral RAG environments for testing and tear them down (`gcloud ai index-endpoints undeploy-index`) to stop billing.
 
 ---
 
-## 🔐 Security & Secret Management
+## Demo & Deployment
 
-**Zero-Trust, Fail-Closed Architecture**
+The system is containerized for easy auditing and deployment.
 
-This repository enforces strict security practices suitable for production environments:
+### Prerequisites
+-   Google Cloud Service Account (Vertex AI User)
+-   Datadog API Key
 
-- **No Embedded Secrets**: Source code contains **zero** API keys, Service Account credentials, or private tokens.
-- **Fail-Closed Config**: The application will **refuse to start** if required environment variables (like `GCP_PROJECT_ID`) are missing.
-- **Identity-Based Auth**: Google Cloud authentication relies entirely on `GOOGLE_APPLICATION_CREDENTIALS` or metadata server identity (in Cloud Run), not hardcoded keys.
-- **Runtime Injection**: All secrets (Datadog API keys, GCP project IDs) must be injected at runtime via environment variables or secret managers.
-- **Judge-Safe**: Judges can clone and inspect this repo safely. To run it, you **must** supply your own credentials.
+### Quick Start (Docker)
 
----
-
-## ✨ Key Innovations
-
-### 1. **Semantic Hallucination Detection via LLM-as-a-Judge** 🧠 ⭐ NEW
-
-Unlike keyword-based heuristics, we implement **Datadog's recommended LLM-as-a-Judge pattern**:
-
-- **Dual-LLM Architecture**: A secondary Gemini 2.0 Flash instance semantically evaluates every response for accuracy, uncertainty, contradictions, and evasiveness
-- **Asynchronous Evaluation**: Zero user-facing latency impact - judge runs in background via `asyncio.create_task()`
-- **Structured Output**: Gemini's JSON mode (`response_mime_type: "application/json"`) ensures reliable score extraction
-- **Production-Grade Cost Tracking**: Judge tokens and costs tracked separately with dedicated metrics
-
-**Metrics Emitted:**
-- `llm.judge.hallucination_score` (0.0-1.0): Semantic accuracy score from judge LLM
-- `llm.judge.cost.usd`: Cost of running background evaluations
-- `llm.judge.tokens.total`: Token usage for judge prompts + responses
-- `llm.judge.high_risk_detected`: Counter incremented when score ≥ 0.7
-
-**How It Works:**
-1. User submits question → receives answer immediately (no wait)
-2. In parallel, judge LLM analyzes the response with structured criteria
-3. Judge emits metrics to Datadog 1-2 seconds later
-4. If score ≥ 0.7, creates a **Case** (quality issue, not incident)
-
-**Innovation:**
-This aligns with Datadog's LLM Observability product vision ([blog post](https://www.datadoghq.com/blog/ai/llm-hallucination-detection/)), proving enterprise-grade quality monitoring is achievable using Vertex AI alone. The async architecture ensures production-grade performance.
-
-> **Authoritative Metrics Only**: We only emit the Judge-based `llm.judge.hallucination_score` to Datadog. No heuristic or estimated metrics are emitted—fail-closed design ensures telemetry integrity.
-
-### 2. **Cost Tracking** 💰
-Per-request actual cost calculation based on official Gemini pricing. Pricing configuration includes `verified_date` and hash for drift detection.
-
-> **Future Enhancement**: A CI job could validate pricing hash against official Gemini pricing API to detect cost model drift automatically.
-
-### 3. **Context-Rich Incidents** 📝
-Datadog surfaces actionable records that allow engineers to pivot to related APM traces, error logs, and runbooks.
-
-### 4. **Traffic Generation** 🎭
-> **For Judges**: A complete traffic generator is included in `traffic-generator/` to help you verify the monitors and dashboards. It creates realistic load, errors, and hallucination scenarios to trigger the Datadog alerts.
-
-### 5. **SLOs with Error Budgets** 🎯
-Availability, latency, and error rate SLOs with burn rate tracking.
-
----
-
-## 🚀 Quick Start
-
-> Docker is the recommended path for evaluation. This container is Cloud Run compatible.
+This is the standard deployment model:
 
 ```bash
-# 1. Clone the repository
-git clone <your-repo-url>
-cd llm-incident-commander
-
-# 2. Create .env from template
+# 1. Config
 cp .env.example .env
-# Edit .env: set GCP_PROJECT_ID and DD_API_KEY
+# Set GCP_PROJECT_ID and DD_API_KEY in .env
 
-# 3. Place your GCP service account key
-mkdir -p ~/secrets
-cp /path/to/your-service-account.json ~/secrets/llm-incident-commander.json
-
-# 4. Run with docker-compose (includes Datadog Agent)
+# 2. Run
 docker-compose up --build
 ```
 
-App: `http://localhost:8080` • Generate traffic:
-```bash
-python3 traffic-generator/advanced_traffic_generator.py --port 8080 --rps 2
-```
+### Traffic Generation
 
-<details>
-<summary>Local Development (without Docker)</summary>
+To prove the observability stack works, we include a traffic generator that simulates real-world patterns (bursts, errors, hallucinations):
 
 ```bash
-# Ensure dependencies are installed first: pip install -r requirements.txt
-# Default uses port 8000
-python3 traffic-generator/advanced_traffic_generator.py --rps 2 --duration 300
+python3 traffic-generator/advanced_traffic_generator.py --rps 2
 ```
 
----
-
-### Local Development (Optional)
-
-For reviewers who prefer running without Docker:
-
-```bash
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-gcloud auth application-default login
-export GCP_PROJECT_ID="your-project-id" DD_API_KEY="your-datadog-key"
-ddtrace-run uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-</details>
+This will populate the Datadog Dashboard with live telemetry.
 
 ---
 
-## ⚙️ Configuration & Operation Modes
+## Why This Matters
 
-The application supports three operation modes to balance functionality and cost. The **Default Mode** allows immediate testing of Gemini 2.0 without complex infrastructure.
+This project moves beyond the "Hello World" of building a chatbot. It addresses the **Day 2 Operations** problem: How do you sleep at night with an LLM in production?
 
-### 1. Gemini Only Mode (Default)
-> **Active by default.** Uses Gemini 2.0 Flash but skips Vector Search (RAG).
-
-- **Behavior**: Application calls Gemini with the user's query directly (no retrieved context).
-- **Cost**: Incurs standard Gemini API costs (low).
-- **Setup**: Zero setup required (beyond authentication).
-- **Config**: `SAFE_MODE=false`, `ENABLE_LLM_GENERATION=true`, `VECTOR_SEARCH_ENABLED=false`
-
-### 2. Full RAG Mode (Production)
-> **Requires Infrastructure.** Uses Gemini 2.0 + Vertex AI Vector Search.
-
-- **Behavior**: Retrieves relevant context, then calls Gemini.
-- **Cost**: Incurs Gemini costs + Vector Search hourly infrastructure costs.
-- **Setup**: Run `setup_vector_search.py` (see below).
-- **Config**: `SAFE_MODE=false`, `VECTOR_SEARCH_ENABLED=true`
-
-### 3. Safe Mode (Zero Cost)
-> **Cost Protection.** Blocks all external API calls.
-
-- **Behavior**: Returns static "disabled" responses.
-- **Cost**: **$0.00 guaranteed.**
-- **Use Case**: Testing UI, Datadog traces, or logic without wallet impact.
-- **Config**: `SAFE_MODE=true`
+By using Datadog to govern the Control Plane, we turn nondeterministic AI behavior into deterministic, manageable operational signals. This is the difference between a demo and a production system.
 
 ---
-
-## 🛡️ Safe Mode & Defaults
-
-To switch to **Safe Mode** (Zero Cost), set this in your `.env`:
-
-```bash
-export SAFE_MODE=true
-```
-
-In Safe Mode, the application returns:
-```json
-{
-  "status": "rag_disabled",
-  "source": "disabled",
-  "answer": "Vector Search is currently disabled. See README for on-demand setup.",
-  "cost_usd": 0.0
-}
-```
-
----
-
-## 🔍 Vector Search (On-Demand Infrastructure)
-
-> **Vector Search infrastructure is intentionally undeployed to prevent idle costs.**
-
-### Why On-Demand?
-
-During development, we observed that **Vertex AI Vector Search is billed per-hour when an index is deployed**, regardless of query volume. A single deployed endpoint incurs continuous costs (~₹5k/day equivalent).
-
-Because:
-- Hackathon results are announced months later
-- Judges do not specify when or whether they will run live infrastructure
-- Always-on paid infra is financially irresponsible
-
-We **intentionally undeploy the index endpoint** and use an **on-demand infrastructure model**. This matches real enterprise practice: infrastructure is provisioned only when needed, not kept running idle.
-
-### Enabling Vector Search
-
-To enable Vector Search for live evaluation:
-
-```bash
-# 1. Deploy infrastructure (provisions billable resources)
-python setup_vector_search.py
-
-# 2. Wait ~5-10 minutes for index readiness
-
-# 3. Disable Safe Mode and restart
-export SAFE_MODE=false
-export ENABLE_LLM_GENERATION=true  # Optional: enable LLM reasoning
-ddtrace-run uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-> ⚠️ **Running `setup_vector_search.py` provisions billable infrastructure.**
-> Delete or undeploy the index after use to avoid ongoing costs.
-
-### Disabling Vector Search After Use
-
-```bash
-# Undeploy to stop hourly costs (keeps index for future redeployment)
-gcloud ai index-endpoints undeploy-index YOUR_ENDPOINT_ID \
-  --deployed-index-id=YOUR_DEPLOYED_INDEX_ID \
-  --region=us-central1
-
-# Or delete entirely
-gcloud ai indexes delete YOUR_INDEX_ID --region=us-central1
-gcloud ai index-endpoints delete YOUR_ENDPOINT_ID --region=us-central1
-```
-
----
-
-## 📊 Datadog Configuration
-
-### Datadog Organization
-
-**Organization Name**: `Lokesh_pusarla`
-
-### Detection Rules (Monitors)
-
-We have configured **8 monitors** to detect LLM-specific issues:
-
-1. **High Latency Alert** (`monitors/high_latency_monitor.json`)
-   - Triggers when avg latency > 2000ms for 5 minutes
-   - Creates **Incident** with SEV-3
-
-2. **Error Rate Threshold** (`monitors/error_rate_monitor.json`)
-   - Triggers when error rate > 5% in 5 minutes
-   - Creates **Incident** with SEV-2
-
-3. **Hallucination Score Alert** (`monitors/hallucination_score_monitor.json`)
-   - Triggers when hallucination score > 0.7 for 10 minutes
-   - Creates **Case** (not incident) for AI team review
-   - ⚠️ *Note: Uses uncertainty phrases as a proxy signal, not a claim of factual correctness*
-
-4. **Quota Exhaustion Alert** (`monitors/quota_exhaustion_monitor.json`)
-   - Triggers on 10+ quota errors in 15 minutes
-   - Creates **Incident** with SEV-1 (critical)
-
-5. **Prompt Explosion Alert** (`monitors/prompt_explosion_monitor.json`) *[NEW]*
-   - Triggers when avg input tokens > 2000 over 5 minutes
-   - Detects potential abuse or runaway automation
-
-6. **Cost Spike Alert** (`monitors/cost_spike_monitor.json`) *[NEW]*
-   - Triggers when cost per request > $0.01 (30x baseline)
-   - Economic protection for budget overruns
-
-7. **LLM Judge Quality Alert** (`monitors/llm_judge_hallucination_monitor.json`) *[INNOVATION]*
-   - Triggers when Judge AI detects semantic hallucination (score > 0.7)
-   - True semantic quality check using Datadog's LLM-as-a-Judge pattern
-
-8. **Security: Prompt Injection Alert** (`monitors/security_prompt_injection_monitor.json`) *[SECURITY]*
-   - Triggers when 3+ injection attempts detected in 5 minutes
-   - Priority 1 (highest) - creates immediate security incident
-
-> **Security Note**: Prompt-injection detection uses regex heuristics (v1). In production, this would be replaced with a lightweight LLM-based intent classifier (e.g., Prompt Shield or similar).
-
-### Service Level Objectives (SLOs)
-
-1. **Availability SLO** - 99% over 30 days
-   - Target: 99% of requests successful
-   - Error budget: 1% (~7.2 hours/month)
-
-2. **Latency SLO** - P95 < 2s over 7 days
-   - Target: 95% of requests under 2000ms
-   - Error budget: 5% (~8.4 hours/week)
-
-3. **Error Rate SLO** - < 1% over 7 days
-   - Target: 99% error-free requests
-   - Error budget: 1%
-
-### Dashboard
-
-**"LLM Incident Commander - Observability"** includes:
-- Request rate, success rate, latency metrics
-- Token usage, cost tracking
-- Hallucination score trends
-- SLO status widgets
-- Active incidents list
-- APM traces and log streams
-
-See `datadog-config/CONFIGURATION_GUIDE.md` for detailed setup instructions.
-
----
-
-## 📁 Project Structure
-
-```
-llm-incident-commander/
-├── app/
-│   ├── main.py              # Application entry point
-│   ├── routes.py            # API endpoints & core logic
-│   ├── rag.py               # Vector Search & Retrieval engine
-│   ├── judge.py             # LLM-as-a-Judge implementation
-│   ├── security.py          # Prompt injection & PII scanners
-│   ├── config.py            # Configuration and pricing constants
-│   └── logging_config.py    # Structured JSON logging for Datadog
-│
-├── traffic-generator/
-│   └── advanced_traffic_generator.py  # Advanced traffic generator
-│
-├── datadog-config/
-│   ├── monitors/            # Monitor JSON exports (4 monitors)
-│   ├── slos/                # SLO configurations (3 SLOs)
-│   ├── dashboards/          # Dashboard JSON export
-│   ├── CONFIGURATION_GUIDE.md  # Step-by-step Datadog setup
-│   └── README.md
-│
-├── screenshots/             # Screenshots for submission
-│   └── (Datadog dashboards, traces, monitors, incidents)
-│
-├── requirements.txt
-├── LICENSE                  # MIT License
-├── README.md               # This file
-```
-
----
-
-## 🔬 Observability Strategy
-
-### LLM-Specific Telemetry
-
-Our observability strategy focuses on metrics that matter for LLM applications:
-
-#### **Performance Metrics**
-- `llm.latency.ms` - End-to-end latency per request
-- `llm.requests.total` - Total request count (by status)
-- percentiles (p50, p95, p99) for latency distribution
-
-#### **Cost & Usage Metrics**
-- `llm.tokens.input` - Input token count (authoritative)
-- `llm.tokens.output` - Output token count (authoritative)
-- `llm.tokens.total` - Total tokens per request
-- `llm.cost.usd` - Actual cost based on Gemini pricing
-
-#### **Quality Metrics** (Authoritative Only)
-- `llm.judge.hallucination_score` - Semantic score from Judge LLM (0.0-1.0)
-- `llm.judge.grounding_coverage` - Percentage of claims backed by context
-- `llm.judge.high_risk_detected` - Counter for high-risk hallucination events
-
-#### **Error Metrics**
-- `llm.errors.total{error_type}` - Errors by type (quota, timeout, api_error)
-
-### APM Integration
-
-- **Custom spans** for LLM operations with detailed tags
-- **Distributed tracing** showing full request lifecycle
-- **Error tracking** with stack traces and context
-
-### Structured Logging
-
-- **JSON logs** with automatic trace correlation
-- **Request IDs** for full request tracking
-- **Cost and token data** in every log entry
-
----
-
-## 🧪 Testing Monitors
-
-### Trigger All Monitors
-
-Run this sequence to demonstrate all detection rules:
-
-```bash
-# 1. Baseline traffic (1 minute)
-python3 traffic-generator/advanced_traffic_generator.py --rps 5 --duration 60
-
-# 2. Trigger latency alert (7 minutes for threshold + evaluation)
-python3 traffic-generator/advanced_traffic_generator.py --scenario slow_query --rps 3 --duration 420
-
-# 3. Trigger error rate alert (6 minutes)
-python3 traffic-generator/advanced_traffic_generator.py --scenario invalid_input --rps 2 --duration 360
-
-# 4. Trigger hallucination alert (11 minutes for threshold)
-python3 traffic-generator/advanced_traffic_generator.py --scenario hallucination_trigger --rps 2 --duration 660
-```
-
-Wait 5-10 minutes after each test for monitors to evaluate and check:
-- **Monitors** page for triggered alerts
-- **Incidents** page for created incidents
-- **Cases** page for the hallucination case
-- **Dashboard** for visual confirmation
-
----
-
-## 📹 Demo Video
-
-**Video URL**: [https://youtu.be/cjZvFY6__qw](https://youtu.be/cjZvFY6__qw?si=RvtE-8uN93KhF8Gi)  
-_3-minute walkthrough covering:_
-1. Observability strategy overview
-2. Detection rules and rationale
-3. Dashboard demonstration
-4. Incident creation with full context
-5. Innovation highlights
-
----
-
-## 🏆 Challenge Requirements Checklist
-
-- [x] **LLM Application** powered by Vertex AI (Gemini 2.0 Flash)
-- [x] **8+ Detection Rules** (14 monitor configurations provided)
-- [x] **3+ SLOs** with error budgets
-- [x] **Incident Management** - Surfaces actionable records via monitors
-- [x] **Case Management** - Quality issues create cases
-- [x] **Dashboard** - Comprehensive observability view
-- [x] **JSON Exports** - All Datadog configs in `/datadog-config`
-- [x] **Traffic Generator** - Multiple scenarios to trigger monitors
-- [x] **README** - Complete deployment instructions
-- [x] **Public repo** with MIT License
-- [ ] **Video walkthrough** (3 minutes)
-- [ ] **Screenshots** showing dashboard, monitors, SLOs, incidents
-
----
-
-## 🔧 API Reference
-
-### POST `/ask`
-
-Send a question to the LLM.
-
-**Request:**
-```json
-{
-  "question": "What is the status of incident #42?",
-  "temperature": 0.7,    // Optional, default: 0.7
-  "max_tokens": 512      // Optional, default: 512
-}
-```
-
-**Response:**
-```json
-{
-  "request_id": "uuid-here",
-  "question": "What is the status of incident #42?",
-  "answer": "LLM response here...",
-  "latency_ms": 1234,
-  "tokens": {
-    "input": 25,
-    "output": 128,
-    "total": 153
-  },
-  "cost_usd": 0.000038,
-  "hallucination_score": 0.33
-}
-```
-
-### GET `/health`
-
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "service": "llm-incident-commander",
-  "version": "1.0.0",
-  "vertex_ai": "connected",
-  "uptime_seconds": 3600
-}
-```
-
----
-
-## 💡 Design Decisions
-
-### Why Gemini 2.0 Flash?
-- Fast response times (typically <500ms)
-- Cost-effective for production use
-- Multimodal capabilities for future enhancements
-
-### Why These Monitor Thresholds?
-- **2000ms latency**: Based on user experience research (2s is acceptable for complex queries)
-- **5% error rate**: Allows for transient issues while catching systemic problems
-- **0.7 hallucination score**: Empirically determined from response analysis
-
-### Why Separate Incidents vs Cases?
-- **Incidents** for urgent issues (latency, errors, quota) - require immediate action
-- **Cases** for quality issues - need review but not urgent
-
----
-
-## 🐛 Troubleshooting
-
-### Metrics not appearing in Datadog
-
-**Check:**
-1. `DD_API_KEY` is set correctly
-2. Application running with `ddtrace-run`
-3. Internet connectivity
-
-**Debug:**
-```bash
-# Check ddtrace debug logs
-cat ddtrace-debug.log
-```
-
-### Vertex AI authentication errors
-
-```bash
-# Re-authenticate
-gcloud auth application-default login
-
-# Verify credentials
-gcloud auth application-default print-access-token
-```
-
-### Monitors not triggering
-
-- Ensure traffic generator has run for sufficient time (5-15 minutes)
-- Check metric data is in Datadog (Metrics Explorer)
-- Verify monitor query syntax
-
----
-
-## 📚 Resources
-
-- [Datadog APM Documentation](https://docs.datadoghq.com/tracing/)
-- [Vertex AI Documentation](https://cloud.google.com/vertex-ai/docs)
-- [Gemini API Reference](https://ai.google.dev/docs)
-- [ddtrace Python](https://ddtrace.readthedocs.io/)
-
----
-
-## 🤝 Contributing
-
-This is a hackathon submission project. Feel free to fork and adapt for your own use cases!
-
----
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-## 👤 Author
-
-**Lokesh Kumar**  
-For the AI Accelerate: Google Cloud Partnerships Hackathon  
-Datadog Challenge
 
 **Datadog Organization**: `Lokesh_pusarla`
-
----
-
-## 🙏 Acknowledgments
-
-- Google Cloud for Vertex AI platform
-- Datadog for comprehensive observability platform
-- Hackathon organizers and mentors
-
----
-
-**Built with ❤️ for the AI Accelerate Hackathon**
+**License**: MIT
